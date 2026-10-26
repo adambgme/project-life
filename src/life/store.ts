@@ -138,7 +138,12 @@ function parseStory(saved: Partial<SavedLifeV3>): Pick<Life, 'eras' | 'moments' 
   return { eras, moments, goals, colours }
 }
 
-const NEWER = Symbol('saved by a newer version')
+export const NEWER = Symbol('saved by a newer version')
+
+/** Read saved data (localStorage, an export file or a link): a life, NEWER, or null if it isn't one. */
+export function parseSaved(raw: string | null): Life | null | typeof NEWER {
+  return parse(raw)
+}
 
 function parse(raw: string | null): Life | null | typeof NEWER {
   if (!raw) return null
@@ -191,6 +196,12 @@ export function saveLife(life: Life): boolean {
     storage.removeItem(STORAGE_KEY)
     return true
   }
+  storage.setItem(STORAGE_KEY, serializeLife(life))
+  return true
+}
+
+/** The life in the saved format (current version), as JSON. */
+export function serializeLife(life: Life): string {
   const profile = life.profile && { ...life.profile, birthDate: toIso(life.profile.birthDate) }
   const saved: SavedLifeV3 = {
     version: 3,
@@ -203,6 +214,5 @@ export function saveLife(life: Life): boolean {
     })),
     colours: life.colours,
   }
-  storage.setItem(STORAGE_KEY, JSON.stringify(saved))
-  return true
+  return JSON.stringify(saved)
 }
