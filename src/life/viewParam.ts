@@ -15,3 +15,8 @@ export function writeView(view: View) {
   else url.searchParams.set('view', view)
   window.history.replaceState(null, '', url)
 }
+
+/** Which page: the grid, or the Explore page (`?page=explore`). */
+export function readPage(search: string): 'grid' | 'explore' {
+  return new URLSearchParams(search).get('page') === 'explore' ? 'explore' : 'grid'
+}

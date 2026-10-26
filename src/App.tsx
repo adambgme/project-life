@@ -16,7 +16,8 @@ import { useLife } from './life/useLife'
 import { useMortality } from './life/useMortality'
 import { boxChances } from './life/gridChances'
 import { exportFile, readLinkFragment } from './life/transfer'
-import { readView, writeView } from './life/viewParam'
+import { readPage, readView, writeView } from './life/viewParam'
+import { ExplorePage } from './explore/ExplorePage'
 
 const UNIT: Record<View, string> = { weeks: 'weeks', months: 'months', years: 'years' }
 
@@ -26,6 +27,7 @@ export function App() {
   const today = useMemo(() => calendarDateIn(new Date(), viewerTimeZone), [])
   const { life, setLife, storageAvailable, newerSave } = useLife(today)
   const [view, setView] = useState(() => readView(window.location.search))
+  const [page] = useState(() => readPage(window.location.search))
   const storyCount = life.eras.length + life.moments.length + life.goals.length
   // A saved story with no (valid) birth date yet, e.g. while the date is being retyped: say it's kept, not Sam's life.
   const waitingForDate = !life.profile && (storyCount > 0 || Object.keys(life.colours).length > 0)
@@ -115,6 +117,31 @@ export function App() {
   function changeView(next: View) {
     setView(next)
     writeView(next)
+  }
+
+  if (page === 'explore') {
+    if (life.profile?.statistics === 'hidden') {
+      return (
+        <main className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-12 sm:px-8">
+          <h1 className="font-display text-4xl">Statistics are hidden</h1>
+          <p>
+            You've chosen to hide statistics. You can turn them back on under "How long is the grid?" on the{' '}
+            <a className="underline" href="./">
+              grid page
+            </a>
+            .
+          </p>
+        </main>
+      )
+    }
+    return (
+      <ExplorePage
+        profile={profile}
+        today={today}
+        isExample={!life.profile}
+        onProfile={(next) => setLife({ ...life, profile: next })}
+      />
+    )
   }
 
   return (

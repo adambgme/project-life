@@ -11,6 +11,14 @@ const loaders = import.meta.glob<EncodedMortalityData>(['../data/mortality/*.jso
   import: 'default',
 })
 
+/** Any nation's tables, decoded (the UK's immediately; others from the site on demand). */
+export async function loadNation(nation: Nation): Promise<MortalityData> {
+  if (nation === 'uk') return UK
+  const load = loaders[`../data/mortality/${nation}.json`]
+  if (!load) throw new Error(`no tables for ${nation}`)
+  return decodeMortality(await load())
+}
+
 /** Which tables are in use. Until a nation's own tables arrive (or if they fail to load) the UK's are used, and
  * `status` says so, so the page never passes off UK figures as another nation's. */
 export type MortalityState = { data: MortalityData; status: 'ready' | 'loading' | 'failed' }

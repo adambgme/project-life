@@ -215,6 +215,12 @@ export function YourDetails(props: Props) {
         </p>
       )}
 
+      {!hidden && (
+        <a href="?page=explore" className="self-start font-display text-base underline decoration-rule underline-offset-4 hover:decoration-ink">
+          Explore your figures in depth →
+        </a>
+      )}
+
       <p className={`text-xs text-ink-soft ${hidden ? 'hidden' : ''}`}>
         {source.attribution}. <a className="underline" href={source.url}>ONS {source.edition} life tables</a>.
         Averages describe groups of people, not any one person.
