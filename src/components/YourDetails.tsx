@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react'
 import type { Basis, Sex } from '../life/mortality'
-import { MAX_GRID_YEARS, NATIONS, type Nation, type Profile } from '../life/store'
+import { MAX_GRID_YEARS, NATIONS, type Nation, type Profile, type Statistics } from '../life/store'
 
 const NATION_NAMES: Record<Nation, string> = {
   uk: 'United Kingdom',
@@ -38,6 +38,7 @@ export function YourDetails(props: Props) {
     props
   const id = useId()
   const set = (patch: Partial<Profile>) => onChange({ ...profile, ...patch })
+  const hidden = profile.statistics === 'hidden'
   // The box holds draft text while typing; it's checked when the person leaves the box or presses Enter.
   const [draft, setDraft] = useState(String(gridYears))
   useEffect(() => setDraft(String(gridYears)), [gridYears])
@@ -56,7 +57,7 @@ export function YourDetails(props: Props) {
       </h2>
 
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1">
+        <div className={`flex flex-col gap-1 ${hidden ? 'hidden' : ''}`}>
           <label htmlFor={`${id}-sex`} className={label}>
             Life tables for
           </label>
@@ -74,7 +75,7 @@ export function YourDetails(props: Props) {
             ))}
           </select>
         </div>
-        <div className="flex flex-col gap-1">
+        <div className={`flex flex-col gap-1 ${hidden ? 'hidden' : ''}`}>
           <label htmlFor={`${id}-nation`} className={label}>
             Where you live
           </label>
@@ -119,7 +120,7 @@ export function YourDetails(props: Props) {
                 onClick={() => set({ gridYears: null })}
                 className="text-sm text-ink-soft underline decoration-rule underline-offset-4 hover:text-ink"
               >
-                Use the figures ({suggestedYears})
+                {hidden ? `Back to ${suggestedYears}` : `Use the figures (${suggestedYears})`}
               </button>
             )}
           </div>
@@ -138,11 +139,11 @@ export function YourDetails(props: Props) {
         </p>
       )}
 
-      <p id={`${id}-sex-note`} className="text-xs text-ink-soft">
+      <p id={`${id}-sex-note`} className={`text-xs text-ink-soft ${hidden ? 'hidden' : ''}`}>
         ONS life tables record only two sexes. "Both, averaged" uses the average of the two.
       </p>
 
-      <fieldset className="flex flex-col gap-1">
+      <fieldset className={`flex flex-col gap-1 ${profile.statistics === 'hidden' ? 'hidden' : ''}`}>
         <legend className={`${label} mb-1`}>Which death rates</legend>
         <div className="flex flex-wrap gap-x-5 gap-y-1">
           {(
@@ -170,18 +171,51 @@ export function YourDetails(props: Props) {
         </p>
       </fieldset>
 
-      <p className="text-base" data-testid="life-expectancy">
-        People like you live to about <strong className="font-semibold">{Math.round(lifeExpectancy)}</strong> on
-        average.{' '}
-        <span className="text-ink-soft">
-          {gridYears === suggestedYears && profile.gridYears === null
-            ? `The grid runs to ${gridYears}, `
-            : `You've set the grid to ${gridYears} years, `}
-          {chanceInWords(chanceAtEnd)}
-        </span>
-      </p>
+      <fieldset className="flex flex-col gap-1">
+        <legend className={`${label} mb-1`}>Statistics</legend>
+        <div className="flex flex-wrap gap-x-5 gap-y-1">
+          {(
+            [
+              ['numbers', 'Just the numbers'],
+              ['grid', 'Show my chances on the grid'],
+              ['hidden', 'Hide all statistics'],
+            ] as [Statistics, string][]
+          ).map(([statistics, text]) => (
+            <label key={statistics} className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name={`${id}-statistics`}
+                checked={profile.statistics === statistics}
+                onChange={() => set({ statistics })}
+                className="accent-accent"
+              />
+              {text}
+            </label>
+          ))}
+        </div>
+      </fieldset>
 
-      <p className="text-xs text-ink-soft">
+      {profile.statistics === 'hidden' ? (
+        <p className="text-base" data-testid="life-expectancy">
+          The grid runs to {gridYears} years.{' '}
+          <span className="text-ink-soft">
+            Statistics are hidden, so it isn't sized from them; turn them back on above whenever you like.
+          </span>
+        </p>
+      ) : (
+        <p className="text-base" data-testid="life-expectancy">
+          People like you live to about <strong className="font-semibold">{Math.round(lifeExpectancy)}</strong> on
+          average.{' '}
+          <span className="text-ink-soft">
+            {gridYears === suggestedYears && profile.gridYears === null
+              ? `The grid runs to ${gridYears}, `
+              : `You've set the grid to ${gridYears} years, `}
+            {chanceInWords(chanceAtEnd)}
+          </span>
+        </p>
+      )}
+
+      <p className={`text-xs text-ink-soft ${hidden ? 'hidden' : ''}`}>
         {source.attribution}. <a className="underline" href={source.url}>ONS {source.edition} life tables</a>.
         Averages describe groups of people, not any one person.
       </p>
