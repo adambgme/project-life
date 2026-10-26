@@ -45,7 +45,7 @@ export function chanceWords(p: number): string {
     [0.5, 'about 1 in 2'],
     [0.25, 'about 1 in 4'],
   ] as const) {
-    if (Math.abs(p - value) <= 0.015) return words
+    if (Math.abs(p - value) <= 0.03) return words
   }
   if (p >= 0.095) return `about ${Math.round(p * 10)} in 10`
   const in100 = Math.round(p * 100)
