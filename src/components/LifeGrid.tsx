@@ -1,6 +1,6 @@
 import { memo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { BOXES_PER_YEAR, boxIndex, boxRange, type CalendarDate, type View } from '../life/lifeMaths'
-import type { BoxStory, Era, Moment } from '../life/story'
+import { countdown, goalDate, weeksToGo, type BoxStory, type Category, type Era, type Goal, type Moment } from '../life/story'
 
 type Props = {
   view: View
@@ -11,8 +11,9 @@ type Props = {
   story: Map<number, BoxStory>
   eras: Map<string, Era>
   moments: Map<string, Moment>
-  /** CSS colour for an era or moment. */
-  colourOf: (entry: Era | Moment) => string
+  goals: Map<string, Goal>
+  /** CSS colour for an entry's category. */
+  colourOf: (entry: { category: Category }) => string
   /** Open a box (click, tap or Enter); absent when the grid is read-only. */
   onOpenBox?: (index: number) => void
 }
@@ -76,10 +77,19 @@ function cellLabel(view: View, index: number, birthDate: CalendarDate | null, to
   return label
 }
 
-/** What's in a box, in words: "Uni, Living in Leeds; moment: Graduated". */
-function storyLabel(box: BoxStory | undefined, eras: Map<string, Era>, moments: Map<string, Moment>): string {
+type Lookup = { eras: Map<string, Era>; moments: Map<string, Moment>; goals: Map<string, Goal>; birth: CalendarDate | null; today: CalendarDate }
+
+/** What's in a box, in words: "goal: Retire (1,233 weeks to go); Uni, Living in Leeds; moment: Graduated". */
+function storyLabel(box: BoxStory | undefined, { eras, moments, goals, birth, today }: Lookup): string {
   if (!box) return ''
   const parts = []
+  if (box.goals.length && birth) {
+    const named = box.goals.map((id) => {
+      const goal = goals.get(id)!
+      return `${goal.label} (${countdown(weeksToGo(today, goalDate(birth, goal)))})`
+    })
+    parts.push(`${box.goals.length === 1 ? 'goal' : 'goals'}: ${named.join(', ')}`)
+  }
   if (box.eras.length) parts.push(box.eras.map((id) => eras.get(id)?.label).join(', '))
   if (box.moments.length) {
     const names = box.moments.map((id) => moments.get(id)?.label).join(', ')
@@ -92,23 +102,29 @@ function storyLabel(box: BoxStory | undefined, eras: Map<string, Era>, moments: 
 function storyStyle(
   box: BoxStory | undefined,
   state: string,
-  eras: Map<string, Era>,
+  { eras, goals }: Lookup,
   colourOf: Props['colourOf'],
 ): CSSProperties | undefined {
-  if (!box || box.eras.length === 0 || state === 'today') return undefined
+  if (!box) return undefined
+  // A goal outlines its box in the goal's colour, over any fill (but never hides this week's marker).
+  const goal = box.goals.length && state !== 'today' ? goals.get(box.goals[0]!) : undefined
+  const outline: CSSProperties = goal ? { boxShadow: `inset 0 0 0 2px ${colourOf(goal)}`, borderColor: colourOf(goal) } : {}
+  if (box.eras.length === 0 || state === 'today') return goal ? outline : undefined
   const [top, ...others] = box.eras.map((id) => colourOf(eras.get(id)!))
   const fill = state === 'ahead' ? `color-mix(in srgb, ${top} 35%, transparent)` : top
   const stripes = others.slice(0, 2).map((c, i) => `${c} ${i * 25}% ${(i + 1) * 25}%`)
   return {
     backgroundColor: fill,
     borderColor: top,
+    ...outline,
     backgroundImage: stripes.length ? `linear-gradient(to top, ${stripes.join(', ')}, transparent ${stripes.length * 25}%)` : undefined,
   }
 }
 
 /** The life grid for one view: a keyboard-navigable ARIA grid with one tab stop (ADR 0001). */
 export const LifeGrid = memo(function LifeGrid(props: Props) {
-  const { view, birthDate, today, years, story, eras, moments, colourOf, onOpenBox } = props
+  const { view, birthDate, today, years, story, eras, moments, goals, colourOf, onOpenBox } = props
+  const lookup: Lookup = { eras, moments, goals, birth: birthDate, today }
   const layout = LAYOUTS[view]
   const perYear = BOXES_PER_YEAR[view]
   const total = years * perYear
@@ -180,7 +196,7 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
       )}
       <p aria-hidden className="min-h-5 truncate text-xs text-ink-soft" data-testid="box-details">
         {detailIndex !== null &&
-          [cellLabel(view, detailIndex, birthDate, todayIndex), storyLabel(story.get(detailIndex), eras, moments)]
+          [cellLabel(view, detailIndex, birthDate, todayIndex), storyLabel(story.get(detailIndex), lookup)]
             .filter(Boolean)
             .join(' · ')}
       </p>
@@ -213,7 +229,7 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
                   const index = row * layout.perRow + col
                   const state = index === todayIndex ? 'today' : index < todayIndex ? 'lived' : 'ahead'
                   const box = story.get(index)
-                  const about = storyLabel(box, eras, moments)
+                  const about = storyLabel(box, lookup)
                   return (
                     <div
                       key={col}
@@ -225,7 +241,8 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
                       aria-label={cellLabel(view, index, birthDate, todayIndex) + (about ? `. ${about}` : '')}
                       data-eras={box?.eras.length || undefined}
                       data-moments={box?.moments.length || undefined}
-                      style={storyStyle(box, state, eras, colourOf)}
+                      data-goals={box?.goals.length || undefined}
+                      style={storyStyle(box, state, lookup, colourOf)}
                       onMouseEnter={() => setHoverIndex(index)}
                       onClick={() => {
                         setFocus({ view, index })

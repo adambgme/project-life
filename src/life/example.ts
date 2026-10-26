@@ -1,5 +1,5 @@
 import { emptyLife, newProfile, type Life } from './store'
-import type { Era, Moment } from './story'
+import type { Era, Goal, Moment } from './story'
 
 const d = (year: number, month: number, day: number) => ({ year, month, day })
 const era = (id: string, label: string, category: Era['category'], start: Era['start'], end: Era['end']): Era => ({
@@ -35,6 +35,10 @@ export const EXAMPLE: { name: string; life: Life } = {
       moment('x-swim', 'Learned to swim', 'health', d(1997, 6, 14)),
       moment('x-met', 'Met Alex', 'relationships', d(2014, 5, 17)),
       moment('x-wed', 'Married Alex', 'relationships', d(2019, 8, 24)),
+    ],
+    goals: [
+      { id: 'x-marathon', label: 'Run a marathon', category: 'health', target: { kind: 'date', date: d(2028, 4, 23) } } satisfies Goal,
+      { id: 'x-retire', label: 'Retire', category: 'work', target: { kind: 'age', age: 60 } } satisfies Goal,
     ],
   },
 }

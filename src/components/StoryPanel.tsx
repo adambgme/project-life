@@ -1,7 +1,19 @@
 import { useEffect, useRef } from 'react'
 import { boxRange, compareDates, type CalendarDate, type View } from '../life/lifeMaths'
 import type { Life } from '../life/store'
-import { CATEGORIES, CATEGORY_NAMES, DEFAULT_COLOURS, type BoxStory, type Category, type Era, type Moment } from '../life/story'
+import {
+  CATEGORIES,
+  CATEGORY_NAMES,
+  DEFAULT_COLOURS,
+  countdown,
+  goalDate,
+  weeksToGo,
+  type BoxStory,
+  type Category,
+  type Era,
+  type Goal,
+  type Moment,
+} from '../life/story'
 import { EntryForm, type Draft } from './EntryForm'
 
 export type PanelMode = { kind: 'list' } | { kind: 'box'; index: number } | { kind: 'edit'; draft: Draft; back: PanelMode }
@@ -13,7 +25,7 @@ type Props = {
   today: CalendarDate
   view: View
   story: Map<number, BoxStory>
-  colourOf: (entry: Era | Moment) => string
+  colourOf: (entry: { category: Category }) => string
   onMode: (mode: PanelMode | null) => void
   onLife: (life: Life) => void
 }
@@ -42,27 +54,70 @@ export function StoryPanel({ mode, life, birthDate, today, view, story, colourOf
     onMode({ kind: 'edit', back, draft: { kind: 'era', isNew: true, entry: { id: newId(), label: '', category: 'home', start, end } } })
   const startMoment = (date: CalendarDate, back: PanelMode) =>
     onMode({ kind: 'edit', back, draft: { kind: 'moment', isNew: true, entry: { id: newId(), label: '', category: 'other', date } } })
+  const startGoal = (date: CalendarDate, back: PanelMode) =>
+    onMode({
+      kind: 'edit',
+      back,
+      draft: { kind: 'goal', isNew: true, entry: { id: newId(), label: '', category: 'other', target: { kind: 'date', date } } },
+    })
   const edit = (draft: Draft, back: PanelMode) => onMode({ kind: 'edit', back, draft })
 
   function save(draft: Draft) {
     if (draft.kind === 'era') {
-      const eras = life.eras.filter((e) => e.id !== draft.entry.id).concat(draft.entry)
-      onLife({ ...life, eras })
+      onLife({ ...life, eras: life.eras.filter((e) => e.id !== draft.entry.id).concat(draft.entry) })
+    } else if (draft.kind === 'moment') {
+      onLife({ ...life, moments: life.moments.filter((m) => m.id !== draft.entry.id).concat(draft.entry) })
     } else {
-      const moments = life.moments.filter((m) => m.id !== draft.entry.id).concat(draft.entry)
-      onLife({ ...life, moments })
+      onLife({ ...life, goals: life.goals.filter((g) => g.id !== draft.entry.id).concat(draft.entry) })
     }
     onMode(mode?.kind === 'edit' ? mode.back : { kind: 'list' })
   }
 
   function remove(draft: Draft) {
     if (draft.kind === 'era') onLife({ ...life, eras: life.eras.filter((e) => e.id !== draft.entry.id) })
-    else onLife({ ...life, moments: life.moments.filter((m) => m.id !== draft.entry.id) })
+    else if (draft.kind === 'moment') onLife({ ...life, moments: life.moments.filter((m) => m.id !== draft.entry.id) })
+    else onLife({ ...life, goals: life.goals.filter((g) => g.id !== draft.entry.id) })
     onMode(mode?.kind === 'edit' ? mode.back : { kind: 'list' })
+  }
+
+  /** A goal reached becomes a moment dated today, opened for editing in case it happened on another day. */
+  function tickOff(goal: Goal, back: PanelMode) {
+    const moment: Moment = { id: newId(), label: goal.label, category: goal.category, date: today }
+    onLife({ ...life, goals: life.goals.filter((g) => g.id !== goal.id), moments: [...life.moments, moment] })
+    onMode({ kind: 'edit', back, draft: { kind: 'moment', isNew: false, entry: moment } })
   }
 
   const eras = [...life.eras].sort((a, b) => compareDates(a.start, b.start))
   const moments = [...life.moments].sort((a, b) => compareDates(a.date, b.date))
+  const goals = [...life.goals].sort((a, b) => compareDates(goalDate(birthDate, a), goalDate(birthDate, b)))
+
+  function GoalList({ goalList, back }: { goalList: Goal[]; back: PanelMode }) {
+    return (
+      <ul className="flex flex-col divide-y divide-rule border-y border-rule" aria-label="Goals" data-testid="goal-list">
+        {goalList.map((goal) => {
+          const date = goalDate(birthDate, goal)
+          return (
+            <li key={goal.id} className="flex items-center gap-3 py-2">
+              <span aria-hidden className="size-3.5 shrink-0 rounded-[2px] border-2" style={{ borderColor: colourOf(goal) }} />
+              <span className="flex-1">
+                <span className="block">{goal.label}</span>
+                <span className="block text-xs text-ink-soft">
+                  {goal.target.kind === 'age' ? `At ${goal.target.age} · ` : ''}
+                  {fullDate.format(utc(date))} · {countdown(weeksToGo(today, date))}
+                </span>
+              </span>
+              <button type="button" className={link} aria-label={`Done: ${goal.label}`} onClick={() => tickOff(goal, back)}>
+                Done
+              </button>
+              <button type="button" className={link} aria-label={`Edit goal ${goal.label}`} onClick={() => edit({ kind: 'goal', isNew: false, entry: goal }, back)}>
+                Edit
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    )
+  }
 
   function EntryList({ eraList, momentList, back }: { eraList: Era[]; momentList: Moment[]; back: PanelMode }) {
     return (
@@ -128,11 +183,16 @@ export function StoryPanel({ mode, life, birthDate, today, view, story, colourOf
           {fullDate.format(utc(start))} – {fullDate.format(utc(end))}
         </h2>
         {here ? (
-          <EntryList
-            eraList={eras.filter((e) => here.eras.includes(e.id))}
-            momentList={moments.filter((m) => here.moments.includes(m.id))}
-            back={mode}
-          />
+          <>
+            {here.goals.length > 0 && <GoalList goalList={goals.filter((g) => here.goals.includes(g.id))} back={mode} />}
+            {here.eras.length + here.moments.length > 0 && (
+              <EntryList
+                eraList={eras.filter((e) => here.eras.includes(e.id))}
+                momentList={moments.filter((m) => here.moments.includes(m.id))}
+                back={mode}
+              />
+            )}
+          </>
         ) : (
           <p className="text-ink-soft">Nothing here yet.</p>
         )}
@@ -147,6 +207,11 @@ export function StoryPanel({ mode, life, birthDate, today, view, story, colourOf
               onClick={() => startMoment(compareDates(end, today) > 0 ? today : first, mode)}
             >
               Add a moment here
+            </button>
+          )}
+          {compareDates(start, today) > 0 && (
+            <button type="button" className={button} onClick={() => startGoal(start, mode)}>
+              Set a goal here
             </button>
           )}
         </div>
@@ -166,7 +231,20 @@ export function StoryPanel({ mode, life, birthDate, today, view, story, colourOf
           <button type="button" className={button} onClick={() => startMoment(today, mode)}>
             Add a moment
           </button>
+          <button
+            type="button"
+            className={button}
+            onClick={() => startGoal({ year: today.year + 1, month: today.month, day: Math.min(today.day, 28) }, mode)}
+          >
+            Add a goal
+          </button>
         </div>
+        {goals.length > 0 && (
+          <section className="flex flex-col gap-2">
+            <h3 className="font-display text-sm tracking-[0.12em] text-ink-soft uppercase">Goals</h3>
+            <GoalList goalList={goals} back={mode} />
+          </section>
+        )}
         {eras.length + moments.length > 0 ? (
           <EntryList eraList={eras} momentList={moments} back={mode} />
         ) : (

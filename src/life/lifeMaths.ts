@@ -36,6 +36,11 @@ export function birthDateProblem(date: CalendarDate, today: CalendarDate): strin
   return null
 }
 
+/** Days from `a` to `b` (negative if `b` is earlier). */
+export function daysBetween(a: CalendarDate, b: CalendarDate): number {
+  return dayNumber(b) - dayNumber(a)
+}
+
 /** Compare two dates: negative if `a` is earlier, 0 if equal, positive if later. */
 export function compareDates(a: CalendarDate, b: CalendarDate): number {
   return dayNumber(a) - dayNumber(b)

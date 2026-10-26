@@ -164,3 +164,85 @@ test('an era still going must have started by today', async ({ page }) => {
   await dialog(page).getByRole('button', { name: 'Save era' }).click()
   await expect(dialog(page).getByRole('alert')).toContainText('must have started by today')
 })
+
+async function addGoal(page: Page, name: string, target: { age: string } | { date: string }) {
+  if (!(await dialog(page).isVisible())) await page.getByRole('button', { name: 'Your story' }).click()
+  await dialog(page).getByRole('button', { name: 'Add a goal' }).click()
+  await dialog(page).getByLabel('Name').fill(name)
+  if ('age' in target) {
+    await dialog(page).getByLabel('An age').check()
+    await dialog(page).getByLabel('Age', { exact: true }).fill(target.age)
+  } else {
+    await dialog(page).getByLabel('Date', { exact: true }).fill(target.date)
+  }
+  await dialog(page).getByRole('button', { name: 'Save goal' }).click()
+}
+
+test('goals by age and by date outline their week and count down', async ({ page }) => {
+  // Retire at 60: 15 Jun 2050, box 60 × 52 = 3120, 1,233 weeks from 26 Oct 2026.
+  await addGoal(page, 'Retire', { age: '60' })
+  // A trip on 1 Jan 2030: box 2056, 166 weeks away.
+  await addGoal(page, 'Big trip', { date: '2030-01-01' })
+
+  const goals = dialog(page).getByTestId('goal-list')
+  await expect(goals.getByRole('listitem')).toHaveText([/Big trip.*166 weeks to go/, /Retire.*At 60.*15 Jun 2050.*1,233 weeks to go/])
+  await dialog(page).getByRole('button', { name: 'Close' }).click()
+
+  await expect(page.locator('[data-goals]')).toHaveCount(2)
+  await expect(box(page, 3120)).toHaveAttribute('data-goals', '1')
+  await expect(box(page, 3120)).toHaveAccessibleName(/goal: Retire \(1,233 weeks to go\)/)
+  await expect(box(page, 2056)).toHaveCSS('box-shadow', /inset/)
+  await expect(page.getByTestId('next-goal')).toHaveText('Next goal: Big trip, 166 weeks to go.')
+  await expect(page.getByTestId('legend')).toContainText('Goal')
+
+  await page.reload()
+  await expect(page.locator('[data-goals]')).toHaveCount(2)
+})
+
+test('a goal reached is ticked off and becomes a moment', async ({ page }) => {
+  await addGoal(page, 'Big trip', { date: '2030-01-01' })
+  await dialog(page).getByRole('button', { name: 'Done: Big trip' }).click()
+  // It opens as a moment dated today, in case it happened on another day.
+  await expect(dialog(page).getByRole('heading', { name: 'Edit moment' })).toBeVisible()
+  await expect(dialog(page).getByLabel('Date', { exact: true })).toHaveValue('2026-10-26')
+  await dialog(page).getByRole('button', { name: 'Save moment' }).click()
+  await dialog(page).getByRole('button', { name: 'Close' }).click()
+
+  await expect(page.locator('[data-goals]')).toHaveCount(0)
+  await expect(page.locator('[data-state="today"]')).toHaveAttribute('data-moments', '1')
+  await expect(page.getByTestId('next-goal')).toHaveCount(0)
+})
+
+test('a goal must be ahead of you, and can be set from a future box', async ({ page }) => {
+  await addGoal(page, 'Too late', { age: '30' })
+  await expect(dialog(page).getByRole('alert')).toHaveText('A goal is something ahead of you. Pick a later date or age.')
+  await dialog(page).getByRole('button', { name: 'Close' }).click()
+
+  await box(page, 2056).click()
+  await expect(dialog(page).getByRole('button', { name: 'Add a moment here' })).toHaveCount(0)
+  await dialog(page).getByRole('button', { name: 'Set a goal here' }).click()
+  await dialog(page).getByLabel('Name').fill('Learn Welsh')
+  await dialog(page).getByRole('button', { name: 'Save goal' }).click()
+  await expect(dialog(page).getByTestId('goal-list')).toContainText('Learn Welsh')
+  await dialog(page).getByRole('button', { name: 'Close' }).click()
+  await expect(box(page, 2056)).toHaveAttribute('data-goals', '1')
+})
+
+test('a goal this week keeps today marked', async ({ page }) => {
+  await addGoal(page, 'Finish the book', { date: '2026-10-30' })
+  await dialog(page).getByRole('button', { name: 'Close' }).click()
+  const today = page.locator('[data-state="today"]')
+  await expect(today).toHaveAttribute('data-goals', '1')
+  await expect(today).toHaveCSS('box-shadow', /rgb\(180, 83, 42\)/)
+})
+
+test('a save from a newer version of the page is never overwritten', async ({ page }) => {
+  const newer = JSON.stringify({ version: 99, everything: 'kept' })
+  await page.evaluate((value) => localStorage.setItem('your-life', value), newer)
+  await page.reload()
+  await expect(page.getByRole('status')).toContainText('saved by a newer version of this page')
+  await page.getByLabel('Day', { exact: true }).fill('15')
+  await page.getByLabel('Month', { exact: true }).selectOption({ label: 'June' })
+  await page.getByLabel('Year', { exact: true }).fill('1990')
+  expect(await page.evaluate(() => localStorage.getItem('your-life'))).toBe(newer)
+})

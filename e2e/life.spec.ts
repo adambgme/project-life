@@ -271,6 +271,7 @@ test('if a nation\'s figures fail to load, the page says the UK\'s are shown', a
 test('the example life shows a made-up story that can\'t be edited', async ({ page }) => {
   await page.goto('./')
   await expect(page.locator('[data-eras]').first()).toBeVisible()
+  await expect(page.locator('[data-goals]')).toHaveCount(2)
   await expect(page.getByTestId('legend')).toContainText('Education')
   await page.locator('[data-index="1000"]').click()
   await expect(page.getByRole('dialog')).toHaveCount(0)

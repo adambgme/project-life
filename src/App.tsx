@@ -9,7 +9,7 @@ import { EXAMPLE } from './life/example'
 import { BOXES_PER_YEAR, boxIndex, calendarDateIn, type View } from './life/lifeMaths'
 import { chanceOfReaching, outlook, suggestedGridYears } from './life/mortality'
 import { emptyLife, MIN_GRID_YEARS, newProfile } from './life/store'
-import { categoryColour, layoutStory, type Era, type Moment } from './life/story'
+import { categoryColour, countdown, goalDate, layoutStory, weeksToGo, type Category } from './life/story'
 import { useLife } from './life/useLife'
 import { useMortality } from './life/useMortality'
 import { readView, writeView } from './life/viewParam'
@@ -20,9 +20,9 @@ const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
 export function App() {
   const today = useMemo(() => calendarDateIn(new Date(), viewerTimeZone), [])
-  const { life, setLife, storageAvailable } = useLife(today)
+  const { life, setLife, storageAvailable, newerSave } = useLife(today)
   const [view, setView] = useState(() => readView(window.location.search))
-  const storyCount = life.eras.length + life.moments.length
+  const storyCount = life.eras.length + life.moments.length + life.goals.length
   // A saved story with no (valid) birth date yet, e.g. while the date is being retyped: say it's kept, not Sam's life.
   const waitingForDate = !life.profile && (storyCount > 0 || Object.keys(life.colours).length > 0)
   const isExample = !life.profile && !waitingForDate
@@ -43,13 +43,18 @@ export function App() {
   const lived = Math.max(0, boxIndex(view, birthDate, today))
   const total = (gridYears * BOXES_PER_YEAR[view]).toLocaleString('en-GB')
   const story = useMemo(
-    () => layoutStory(view, birthDate, today, shown.eras, shown.moments),
-    [view, birthDate, today, shown.eras, shown.moments],
+    () => layoutStory(view, birthDate, today, shown.eras, shown.moments, shown.goals),
+    [view, birthDate, today, shown.eras, shown.moments, shown.goals],
   )
+  const goalsById = useMemo(() => new Map(shown.goals.map((g) => [g.id, g])), [shown.goals])
+  const nextGoal = shown.goals
+    .map((goal) => ({ goal, weeks: weeksToGo(today, goalDate(birthDate, goal)) }))
+    .filter(({ weeks }) => weeks >= 0)
+    .sort((a, b) => a.weeks - b.weeks)[0]
   const erasById = useMemo(() => new Map(shown.eras.map((e) => [e.id, e])), [shown.eras])
   const momentsById = useMemo(() => new Map(shown.moments.map((m) => [m.id, m])), [shown.moments])
   const colours = shown.colours
-  const colourOf = useMemo(() => (entry: Era | Moment) => categoryColour(entry.category, colours), [colours])
+  const colourOf = useMemo(() => (entry: { category: Category }) => categoryColour(entry.category, colours), [colours])
   const openBox = useMemo(() => (isExample ? undefined : (index: number) => setPanel({ kind: 'box', index })), [isExample])
 
   function forget(): boolean {
@@ -57,7 +62,7 @@ export function App() {
     if (
       storyCount > 0 &&
       !window.confirm(
-        `This deletes your date of birth and your story (${plural(life.eras.length, 'era')}, ${plural(life.moments.length, 'moment')}) from this browser. Forget everything?`,
+        `This deletes your date of birth and your story (${plural(life.eras.length, 'era')}, ${plural(life.moments.length, 'moment')}, ${plural(life.goals.length, 'goal')}) from this browser. Forget everything?`,
       )
     ) {
       return false
@@ -86,7 +91,9 @@ export function App() {
 
       {!storageAvailable && (
         <p role="status" className="border-l-2 border-today bg-paper-deep px-3 py-2 text-sm">
-          This browser isn't letting the page save anything, so your date will be forgotten when you leave.
+          {newerSave
+            ? 'This browser has your life saved by a newer version of this page. Reload to see it; nothing here will be saved until then.'
+            : "This browser isn't letting the page save anything, so your date will be forgotten when you leave."}
         </p>
       )}
 
@@ -131,6 +138,11 @@ export function App() {
             <strong className="font-semibold">{lived.toLocaleString('en-GB')}</strong> {UNIT[view]}
             <span className="text-ink-soft">, of the {total} on a {gridYears}-year grid.</span>
           </p>
+          {nextGoal && (
+            <p className="text-base" data-testid="next-goal">
+              Next goal: <strong className="font-semibold">{nextGoal.goal.label}</strong>, {countdown(nextGoal.weeks)}.
+            </p>
+          )}
           {isExample && (
             <p className="text-sm text-ink-soft">Enter your date of birth above to see your own. Nothing is saved until you do.</p>
           )}
@@ -145,9 +157,15 @@ export function App() {
               Your story
             </button>
             <span className="text-sm text-ink-soft">
-              {life.eras.length + life.moments.length === 0
-                ? 'Tap any box to add an era or a moment there.'
-                : `${life.eras.length} ${life.eras.length === 1 ? 'era' : 'eras'}, ${life.moments.length} ${life.moments.length === 1 ? 'moment' : 'moments'}. Tap a box to add or edit.`}
+              {storyCount === 0
+                ? 'Tap any box to add an era, a moment or a goal there.'
+                : `${[
+                    [life.eras.length, 'era'],
+                    [life.moments.length, 'moment'],
+                    [life.goals.length, 'goal'],
+                  ]
+                    .map(([n, word]) => `${n} ${word}${n === 1 ? '' : 's'}`)
+                    .join(', ')}. Tap a box to add or edit.`}
             </span>
           </div>
         )}
@@ -160,11 +178,12 @@ export function App() {
             story={story}
             eras={erasById}
             moments={momentsById}
+            goals={goalsById}
             colourOf={colourOf}
             onOpenBox={openBox}
           />
         </div>
-        <Legend eras={shown.eras} moments={shown.moments} colours={colours} />
+        <Legend eras={shown.eras} moments={shown.moments} goals={shown.goals} colours={colours} />
         </>
         )}
         {life.profile && (
