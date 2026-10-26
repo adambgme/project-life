@@ -98,3 +98,42 @@ test('while a nation is loading or fails, Explore says the figures are the UK\'s
   await expect(page.getByText('living in United Kingdom')).toBeVisible()
   pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !e.includes('Failed to load resource')))
 })
+
+test('causes of death: the commonest at your age, and at any age ahead', async ({ page }) => {
+  await seed(page, { ...PROFILE, nation: 'england' })
+  await page.goto('./?page=explore')
+  const ages = page.getByLabel('Ages')
+  await expect(ages.locator('option:checked')).toHaveText('35 to 39 (your age now)')
+  // Bands before your age aren't offered.
+  await expect(ages.locator('option').first()).toHaveText('35 to 39 (your age now)')
+  const causes = page.getByTestId('causes').getByRole('listitem')
+  await expect(causes).toHaveCount(6)
+  await expect(page.getByText(/Of the [\d,]+ deaths of men aged 35 to 39 registered in England and Wales in 2025/)).toBeVisible()
+  await expect(causes.first()).toHaveText(/\d+(\.\d)?%$/)
+  await expect(page.getByTestId('causes-support')).toContainText('Samaritans')
+
+  const youngTop = await causes.first().textContent()
+  await ages.selectOption({ label: '80 to 84' })
+  await expect(causes.first()).not.toHaveText(youngTop!)
+  await expect(page.getByText(/deaths of men aged 80 to 84/)).toBeVisible()
+
+  await page.getByText('Show all causes at this age').click()
+  expect(await page.locator('details[open] tbody tr').count()).toBeGreaterThan(20)
+})
+
+test('in Scotland, causes say they are England and Wales figures', async ({ page }) => {
+  await seed(page, PROFILE)
+  await page.goto('./?page=explore')
+  await expect(page.getByText('Scotland and Northern Ireland record causes of death separately, so these figures are for England and Wales')).toBeVisible()
+})
+
+test('after a birthday into a new band, the causes follow your new age', async ({ page }) => {
+  // 39 on 26 Oct 2026, 40 from 28 Oct.
+  await seed(page, { ...PROFILE, nation: 'england', birthDate: '1986-10-28' })
+  await page.goto('./?page=explore')
+  await expect(page.getByLabel('Ages').locator('option:checked')).toHaveText('35 to 39 (your age now)')
+  await page.evaluate((p) => localStorage.setItem('your-life', JSON.stringify({ version: 3, profile: p, eras: [], moments: [], goals: [], colours: {} })), { ...PROFILE, nation: 'england', birthDate: '1986-10-20' })
+  await page.reload()
+  await expect(page.getByLabel('Ages').locator('option:checked')).toHaveText('40 to 44 (your age now)')
+  await expect(page.getByText(/deaths of men aged 40 to 44/)).toBeVisible()
+})

@@ -50,5 +50,25 @@ export const REFERENCE_FILES = [
 ]
 
 export function allFiles() {
-  return [...NATIONS.flatMap((nation) => VARIANTS.map((variant) => qxFile(nation, variant))), ...REFERENCE_FILES]
+  return [
+    ...NATIONS.flatMap((nation) => VARIANTS.map((variant) => qxFile(nation, variant))),
+    ...REFERENCE_FILES,
+    { name: CAUSES.name, url: CAUSES.url, kind: 'csv' as const },
+  ]
+}
+
+/** ONS deaths registered in England and Wales by underlying cause (ONS leading-causes list), sex and 5-year age band,
+ * latest year, via Nomis dataset NM_161. Cause 0 is all causes; 999100–999345 are the leading-cause groups and their
+ * sub-groups (the build keeps the groups ONS ranks: sub-groups for accidents and cancers, groups for the rest). */
+export const CAUSES = {
+  name: 'nomis-nm161-leading-causes.csv',
+  url:
+    'https://www.nomisweb.co.uk/api/v01/dataset/NM_161_1.data.csv?geography=2092957703&cause_of_death=0,999100...999345' +
+    '&gender=0,1,2&age=1...20&measure=1&measures=20100&time=latest' +
+    '&select=date_name,cause_of_death,cause_of_death_name,gender_name,age,age_name,obs_value',
+  title: 'Deaths registered in England and Wales, by underlying cause, sex and age (Nomis NM_161)',
+  /** The ONS bulletin for the year the data is from. */
+  page: (year: number) =>
+    `https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/bulletins/deathsregistrationsummarytables/${year}`,
+  attribution: 'Source: Office for National Statistics licensed under the Open Government Licence v3.0',
 }

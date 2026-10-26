@@ -4,6 +4,7 @@ import { chanceWords } from '../life/gridChances'
 import { ageAtChance, chanceOfReaching, deathRate, outlook, type Basis, type MortalityData } from '../life/mortality'
 import { NATIONS, type Nation, type Profile } from '../life/store'
 import { loadNation, useMortality } from '../life/useMortality'
+import { CausesSection } from './CausesSection'
 import { LineChart, type Point } from './LineChart'
 
 const NATION_NAMES: Record<Nation, string> = {
@@ -220,6 +221,17 @@ export function ExplorePage({ profile, today, isExample, onProfile }: Props) {
             table={{ xHeader: 'Age', yHeader: 'Yearly risk', every: 5 }}
           />
           <p className="text-xs text-ink-soft">{source}</p>
+        </section>
+
+        <section className={section} aria-labelledby="causes-title">
+          <h2 id="causes-title" className={h2}>
+            What people your age most often die of
+          </h2>
+          <p className="text-sm text-ink-soft">
+            At younger ages deaths are rare and often sudden; later on, long illnesses take over. Choose an age to see how
+            it changes.
+          </p>
+          <CausesSection age={from} sex={profile.sex} outsideEnglandWales={profile.nation === 'scotland' || profile.nation === 'northern-ireland'} />
         </section>
 
         <section className={section} aria-labelledby="nations-title">
