@@ -1,14 +1,30 @@
 # Your Life
 
-A visualization of your life, as divided into years, months, and weeks.
+A visualization of your life in years, months and weeks. Your date of birth (and everything else you add) stays in
+your browser: nothing is sent anywhere.
 
-## Demos
- - **[Your life in Years](https://bryanbraun.github.io/your-life/years.html)**
- - **[Your life in Months](https://bryanbraun.github.io/your-life/months.html)**
- - **[Your life in Weeks](https://bryanbraun.github.io/your-life/weeks.html)**
+Live at <https://adambgme.github.io/project-life/>. The redesign is planned in [issue #2](https://github.com/adambgme/project-life/issues/2);
+the original static pages are kept in the repo under `legacy/` for reference. The live site still serves the old
+pages until the parity release ([T2, #4](https://github.com/adambgme/project-life/issues/4)) adds the Pages deploy.
+
+## Develop
+
+Node 24+.
+
+```sh
+npm install
+npm run dev        # http://localhost:5173/project-life/
+npm test           # unit tests (Vitest)
+npx playwright install chromium
+npm run e2e        # browser journeys (Playwright, desktop + phone)
+npm run typecheck && npm run lint
+```
 
 ## Credit
-Based on the [Your life in Weeks](http://waitbutwhy.com/2014/05/life-weeks.html) post by Tim Urban, from [Wait But Why](http://waitbutwhy.com/).
+
+Forked from [bryanbraun/your-life](https://github.com/bryanbraun/your-life) (MIT), based on the
+[Your Life in Weeks](https://waitbutwhy.com/2014/05/life-weeks.html) post by Tim Urban, from
+[Wait But Why](https://waitbutwhy.com/).
 
 ## Vendored skills
 
