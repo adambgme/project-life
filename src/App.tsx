@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BirthDateForm } from './components/BirthDateForm'
+import { ImportButton } from './components/ImportButton'
+import { ImportDialog, type PendingImport } from './components/ImportDialog'
 import { LifeGrid } from './components/LifeGrid'
 import { ViewToggle } from './components/ViewToggle'
 import { Legend } from './components/Legend'
@@ -12,6 +14,7 @@ import { emptyLife, MIN_GRID_YEARS, newProfile } from './life/store'
 import { categoryColour, countdown, goalDate, layoutStory, weeksToGo, type Category } from './life/story'
 import { useLife } from './life/useLife'
 import { useMortality } from './life/useMortality'
+import { exportFile, readLinkFragment } from './life/transfer'
 import { readView, writeView } from './life/viewParam'
 
 const UNIT: Record<View, string> = { weeks: 'weeks', months: 'months', years: 'years' }
@@ -31,6 +34,34 @@ export function App() {
   const shown = life.profile ? life : EXAMPLE.life
   const profile = shown.profile!
   const [panel, setPanel] = useState<PanelMode | null>(null)
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null)
+
+  // A "send to my phone" link, on load or opened into a tab that already has the page: offer its contents.
+  useEffect(() => {
+    const check = () =>
+      void readLinkFragment(window.location.hash).then((result) => result && setPendingImport({ source: 'link', result }))
+    check()
+    window.addEventListener('hashchange', check)
+    return () => window.removeEventListener('hashchange', check)
+  }, [])
+
+  /** Done with an import: take a link's data out of the address (unless it's for a newer version, so a reload can
+   * read it). */
+  function closeImport() {
+    if (pendingImport?.source === 'link' && !(!pendingImport.result.ok && pendingImport.result.newer)) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+    setPendingImport(null)
+  }
+
+  function exportBackup() {
+    const { name, text } = exportFile(life, today)
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
+    const a = Object.assign(document.createElement('a'), { href: url, download: name })
+    a.click()
+    // Some browsers start the download after the click returns, so keep the file around for a moment.
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  }
   const birthDate = profile.birthDate
   const { data: mortality, status: mortalityStatus } = useMortality(profile.nation)
   const personal = useMemo(
@@ -107,6 +138,12 @@ export function App() {
           canForget={!!life.profile || waitingForDate}
           onForget={forget}
         />
+        {!life.profile && (
+          <p className="-mt-3 text-sm text-ink-soft">
+            Have a backup?{' '}
+            <ImportButton className="underline decoration-rule underline-offset-4 hover:text-ink" onPending={setPendingImport} />
+          </p>
+        )}
         {life.profile && (
           <YourDetails
             profile={life.profile}
@@ -197,8 +234,20 @@ export function App() {
             colourOf={colourOf}
             onMode={setPanel}
             onLife={setLife}
+            onExport={exportBackup}
+            onPendingImport={setPendingImport}
           />
         )}
+        <ImportDialog
+          pending={pendingImport}
+          current={life}
+          onCancel={closeImport}
+          onReplace={(imported) => {
+            setPanel(null)
+            closeImport()
+            setLife(imported)
+          }}
+        />
       </main>
 
       <footer className="mt-auto border-t border-rule pt-4 text-sm text-ink-soft">

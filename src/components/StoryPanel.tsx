@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import { boxRange, compareDates, type CalendarDate, type View } from '../life/lifeMaths'
 import type { Life } from '../life/store'
 import {
@@ -15,8 +15,17 @@ import {
   type Moment,
 } from '../life/story'
 import { EntryForm, type Draft } from './EntryForm'
+import { ImportButton } from './ImportButton'
+import type { PendingImport } from './ImportDialog'
 
-export type PanelMode = { kind: 'list' } | { kind: 'box'; index: number } | { kind: 'edit'; draft: Draft; back: PanelMode }
+/** The QR code encoder is only needed here, so it loads when this view opens. */
+const SendToPhone = lazy(() => import('./SendToPhone').then((m) => ({ default: m.SendToPhone })))
+
+export type PanelMode =
+  | { kind: 'list' }
+  | { kind: 'box'; index: number }
+  | { kind: 'edit'; draft: Draft; back: PanelMode }
+  | { kind: 'phone' }
 
 type Props = {
   mode: PanelMode | null
@@ -28,6 +37,8 @@ type Props = {
   colourOf: (entry: { category: Category }) => string
   onMode: (mode: PanelMode | null) => void
   onLife: (life: Life) => void
+  onExport: () => void
+  onPendingImport: (pending: PendingImport) => void
 }
 
 const monthYear = new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' })
@@ -40,7 +51,8 @@ const link = 'text-sm text-ink-soft underline decoration-rule underline-offset-4
 
 /** "Your story": every era and moment, add and edit them, and category colours. A side drawer on wide screens and a
  * bottom sheet on phones (a native modal dialog, so focus stays inside and Escape closes it). */
-export function StoryPanel({ mode, life, birthDate, today, view, story, colourOf, onMode, onLife }: Props) {
+export function StoryPanel(props: Props) {
+  const { mode, life, birthDate, today, view, story, colourOf, onMode, onLife, onExport, onPendingImport } = props
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const dialog = ref.current
@@ -160,7 +172,19 @@ export function StoryPanel({ mode, life, birthDate, today, view, story, colourOf
   }
 
   let body = null
-  if (mode?.kind === 'edit') {
+  if (mode?.kind === 'phone') {
+    body = (
+      <div className="flex flex-col gap-4">
+        <h2 className="font-display text-2xl">Send to my phone</h2>
+        <Suspense fallback={<p className="text-sm text-ink-soft">Making the code…</p>}>
+          <SendToPhone life={life} />
+        </Suspense>
+        <button type="button" className={`${link} self-start`} onClick={() => onMode({ kind: 'list' })}>
+          Back to your story
+        </button>
+      </div>
+    )
+  } else if (mode?.kind === 'edit') {
     body = (
       <EntryForm
         key={mode.draft.entry.id}
@@ -253,6 +277,21 @@ export function StoryPanel({ mode, life, birthDate, today, view, story, colourOf
             one there.
           </p>
         )}
+        <section className="flex flex-col gap-2 text-sm" aria-labelledby="backup-title">
+          <h3 id="backup-title" className="font-display text-sm tracking-[0.12em] text-ink-soft uppercase">
+            Back up or move
+          </h3>
+          <p className="text-ink-soft">Everything lives only in this browser. Keep a copy, or move it to another device.</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={button} onClick={onExport}>
+              Export a file
+            </button>
+            <ImportButton className={button} onPending={onPendingImport} />
+            <button type="button" className={button} onClick={() => onMode({ kind: 'phone' })}>
+              Send to my phone
+            </button>
+          </div>
+        </section>
         <details className="text-sm">
           <summary className="cursor-pointer font-display tracking-wide">Category colours</summary>
           <ul className="mt-3 grid grid-cols-2 gap-2">
@@ -282,7 +321,7 @@ export function StoryPanel({ mode, life, birthDate, today, view, story, colourOf
   return (
     <dialog
       ref={ref}
-      aria-label={mode?.kind === 'list' ? 'Your story' : 'Edit your story'}
+      aria-label={mode?.kind === 'list' ? 'Your story' : mode?.kind === 'phone' ? 'Send to my phone' : 'Edit your story'}
       onClose={() => onMode(null)}
       onClick={(e) => e.target === ref.current && onMode(null)}
       className="fixed inset-x-0 top-auto bottom-0 m-0 max-h-[85dvh] w-full max-w-none overflow-y-auto rounded-t-lg border-t border-ink bg-paper p-5 text-ink backdrop:bg-ink/30 sm:inset-y-0 sm:right-0 sm:left-auto sm:h-dvh sm:max-h-none sm:w-[28rem] sm:rounded-none sm:border-t-0 sm:border-l"
