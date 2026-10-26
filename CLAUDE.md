@@ -9,8 +9,8 @@ GitHub Pages at <https://adambgme.github.io/project-life/>. Owned by the **Life 
   their browser; examples use obviously made-up data.
 - **Shipping:** `gh-pages` has no protection or required checks yet, so open PRs and leave them for Adam (no
   `ship-pr`) until the repo meets ~/Work/briefs/PLATFORM-STANDARD.md §8.
-- **Pages deploys from GitHub Actions** (build type `workflow`, since 26 Oct 2026). Pushing to `gh-pages` no longer
-  publishes. The first Actions deploy replaces the live site, so it must be a working build.
+- **Pages deploys from GitHub Actions** (build type `workflow`, since 26 Oct 2026): the `Deploy` workflow runs CI,
+  builds and publishes on every push to `gh-pages` (T2, #4). A merge is a release.
 - No AI attribution lines in commits or PRs.
 - Keep the MIT licence and the credit to Bryan Braun and Wait But Why.
 

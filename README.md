@@ -4,8 +4,8 @@ A visualization of your life in years, months and weeks. Your date of birth (and
 your browser: nothing is sent anywhere.
 
 Live at <https://adambgme.github.io/project-life/>. The redesign is planned in [issue #2](https://github.com/adambgme/project-life/issues/2);
-the original static pages are kept in the repo under `legacy/` for reference. The live site still serves the old
-pages until the parity release ([T2, #4](https://github.com/adambgme/project-life/issues/4)) adds the Pages deploy.
+every merge to `gh-pages` is tested and deployed to Pages by the `Deploy` workflow. The old addresses (`years.html`,
+`months.html`, `weeks.html`) redirect to the matching view; the original static pages are in git history.
 
 ## Develop
 

@@ -5,6 +5,10 @@ import { expect, test, type Page } from '@playwright/test'
 // (week 19 of the row), so 36 × 52 + 19 = 1,891 weeks are fully lived and box 1,891 is this week.
 const NOW = new Date('2026-10-26T12:00:00Z')
 const LIVED = 1891
+// The example life (Sam, born 4 Mar 1990) on the same day: 36 × 52 + 33 weeks.
+const EXAMPLE_LIVED = 1905
+
+const example = (page: Page) => page.getByTestId('example')
 
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(NOW)
@@ -18,11 +22,15 @@ async function enterBirthDate(page: Page, day: string, month: string, year: stri
 
 test('entering a date of birth fills the weeks lived, and it is remembered', async ({ page }) => {
   await page.goto('./')
-  await expect(page.locator('[data-state="lived"]')).toHaveCount(0)
+  await expect(example(page)).toBeVisible()
+  await expect(page.getByTestId('summary')).toHaveText('Sam has lived 1,905 weeks, of the 4,680 on a 90-year grid.')
+  await expect(page.locator('[data-state="lived"]')).toHaveCount(EXAMPLE_LIVED)
+  expect(await page.evaluate(() => localStorage.getItem('your-life'))).toBeNull()
 
   await enterBirthDate(page, '15', 'June', '1990')
 
-  await expect(page.getByTestId('summary')).toHaveText("You've lived 1,891 weeks.")
+  await expect(example(page)).toBeHidden()
+  await expect(page.getByTestId('summary')).toHaveText("You've lived 1,891 weeks, of the 4,680 on a 90-year grid.")
   await expect(page.locator('[data-state="lived"]')).toHaveCount(LIVED)
   await expect(page.locator('[data-state="today"]')).toHaveAttribute('data-index', String(LIVED))
 
@@ -35,16 +43,17 @@ test('an impossible date is explained and not used', async ({ page }) => {
   await page.goto('./')
   await enterBirthDate(page, '31', 'April', '1990')
   await expect(page.getByRole('alert')).toHaveText("That date doesn't exist. Check the day and month.")
-  await expect(page.locator('[data-state="lived"]')).toHaveCount(0)
+  await expect(example(page)).toBeVisible()
 })
 
 test('forgetting the date clears the grid and the saved copy', async ({ page }) => {
   await page.goto('./')
   await enterBirthDate(page, '15', 'June', '1990')
   await page.getByRole('button', { name: 'Forget my date' }).click()
-  await expect(page.locator('[data-state="lived"]')).toHaveCount(0)
+  await expect(example(page)).toBeVisible()
   await page.reload()
   await expect(page.getByLabel('Year', { exact: true })).toHaveValue('')
+  await expect(example(page)).toBeVisible()
 })
 
 test('a date of birth saved by the old site is carried over', async ({ page }) => {
@@ -68,7 +77,7 @@ test('a half-typed date left by the old site is ignored', async ({ page }) => {
   })
   await page.goto('./')
   await expect(page.getByLabel('Year', { exact: true })).toHaveValue('')
-  await expect(page.locator('[data-state="lived"]')).toHaveCount(0)
+  await expect(example(page)).toBeVisible()
 })
 
 test('forgetting a date carried over from the old site sticks', async ({ page }) => {
@@ -83,7 +92,7 @@ test('forgetting a date carried over from the old site sticks', async ({ page })
   await page.getByRole('button', { name: 'Forget my date' }).click()
   await page.reload()
   await expect(page.getByLabel('Year', { exact: true })).toHaveValue('')
-  await expect(page.locator('[data-state="lived"]')).toHaveCount(0)
+  await expect(example(page)).toBeVisible()
 })
 
 test('the grid follows the form when a saved date is edited into something unusable', async ({ page }) => {
@@ -93,7 +102,7 @@ test('the grid follows the form when a saved date is edited into something unusa
 
   await page.getByLabel('Year', { exact: true }).fill('2030')
   await expect(page.getByRole('alert')).toHaveText('That date is in the future.')
-  await expect(page.locator('[data-state="lived"]')).toHaveCount(0)
+  await expect(example(page)).toBeVisible()
 
   await page.getByLabel('Year', { exact: true }).fill('')
   await page.reload()
@@ -146,8 +155,45 @@ test('no request leaves the site, and the page passes an accessibility scan', as
   // Every row of the grid is built the same way; scanning all 4,680 boxes takes axe over 30s.
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
-    .exclude('[role="row"]:nth-child(n+3):not(:has([data-state="today"]))')
+    .exclude('[role="grid"] > div:nth-child(n+3):not(:has([data-state="today"]))')
     .analyze()
   expect(results.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([])
   expect(external).toEqual([])
+})
+
+test('years, months and weeks views, each with today marked, remembered in the address', async ({ page }) => {
+  await page.goto('./')
+  await enterBirthDate(page, '15', 'June', '1990')
+
+  await page.getByRole('radio', { name: 'Months' }).check({ force: true })
+  await expect(page).toHaveURL(/\?view=months$/)
+  await expect(page.getByRole('grid')).toHaveAccessibleName('Your life in months: three years per row')
+  await expect(page.getByTestId('summary')).toHaveText("You've lived 436 months, of the 1,080 on a 90-year grid.")
+  await expect(page.locator('[data-state="lived"]')).toHaveCount(436)
+  await expect(page.locator('[data-state="today"]')).toHaveAccessibleName(
+    'Age 36, month 5: 15 Oct 2026 to 14 Nov 2026, this month',
+  )
+
+  await page.reload()
+  await expect(page.getByRole('radio', { name: 'Months' })).toBeChecked()
+
+  await page.getByRole('radio', { name: 'Years' }).check({ force: true })
+  await expect(page).toHaveURL(/\?view=years$/)
+  await expect(page.locator('[data-state="lived"]')).toHaveCount(36)
+  await expect(page.locator('[data-state="today"]')).toHaveAccessibleName('Age 36: 15 Jun 2026 to 14 Jun 2027, this year')
+
+  await page.getByRole('radio', { name: 'Weeks' }).check({ force: true })
+  await expect(page).toHaveURL(/\/project-life\/$/)
+  await expect(page.locator('[data-state="lived"]')).toHaveCount(LIVED)
+})
+
+test('the old page addresses still work', async ({ page }) => {
+  await page.goto('years.html')
+  await expect(page).toHaveURL(/\/project-life\/\?view=years$/)
+  await expect(page.getByRole('radio', { name: 'Years' })).toBeChecked()
+  await page.goto('months.html')
+  await expect(page.getByRole('radio', { name: 'Months' })).toBeChecked()
+  await page.goto('weeks.html')
+  await expect(page).toHaveURL(/\/project-life\/$/)
+  await expect(page.getByRole('radio', { name: 'Weeks' })).toBeChecked()
 })

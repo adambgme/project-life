@@ -7,9 +7,11 @@ on:
 permissions:
   contents: read
 
+# Superseded PR runs are cancelled. A run called by Deploy (a merge) gets its own group, so it is never cancelled
+# or dropped from the queue by a later merge.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   typecheck-lint:

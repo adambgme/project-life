@@ -120,7 +120,7 @@ export function BirthDateForm({ birthDate, today, onChange }: Props) {
           </button>
         )}
       </fieldset>
-      <p id={`${id}-error`} className="min-h-6 text-sm text-error" role="alert">
+      <p id={`${id}-error`} className="text-sm text-error" role="alert">
         {error}
       </p>
     </form>
