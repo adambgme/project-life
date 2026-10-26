@@ -1,0 +1,57 @@
+@import 'tailwindcss';
+
+/* Warm editorial theme: paper, ink and one green accent (a calmer take on the 2023 green). */
+@theme {
+  --font-display: 'Fraunces Variable', Georgia, serif;
+  --font-serif: 'Source Serif 4 Variable', Georgia, serif;
+
+  --color-paper: #f5efe3;
+  --color-paper-deep: #ebe3d3;
+  --color-ink: #2a2520;
+  --color-ink-soft: #5c5348;
+  --color-rule: #cfc4b0;
+  --color-accent: #3f6b45;
+  --color-accent-ink: #2d5233;
+  --color-today: #b4532a;
+  --color-error: #9c2f1d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #1c1916;
+    --color-paper-deep: #26221d;
+    --color-ink: #ece3d3;
+    --color-ink-soft: #b3a895;
+    --color-rule: #4a4238;
+    --color-accent: #8fbf8c;
+    --color-accent-ink: #b5dbb1;
+    --color-today: #e58a5c;
+    --color-error: #f0937c;
+  }
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-serif);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-today);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
