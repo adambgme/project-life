@@ -85,3 +85,34 @@ export function calendarDateIn(instant: Date, timeZone: string): CalendarDate {
   const part = (type: string) => Number(parts.find((p) => p.type === type)?.value)
   return { year: part('year'), month: part('month'), day: part('day') }
 }
+
+/** The three ways to view a life. Every view has one group of boxes per year of age. */
+export type View = 'weeks' | 'months' | 'years'
+
+export const BOXES_PER_YEAR: Record<View, number> = { weeks: WEEKS_PER_ROW, months: 12, years: 1 }
+
+/** The date `months` months after birth. A day the month doesn't have rolls to the 1st of the next month, matching
+ * the 29 February → 1 March birthday rule. */
+function monthiversary(birth: CalendarDate, months: number): CalendarDate {
+  const total = birth.month - 1 + months
+  const date = { year: birth.year + Math.floor(total / 12), month: (total % 12) + 1, day: birth.day }
+  if (isRealDate(date)) return date
+  return date.month === 12 ? { year: date.year + 1, month: 1, day: 1 } : { year: date.year, month: date.month + 1, day: 1 }
+}
+
+/** The box (0-based) a date falls in for a view, or -1 before birth. */
+export function boxIndex(view: View, birth: CalendarDate, date: CalendarDate): number {
+  if (view === 'weeks') return weekIndex(birth, date)
+  const age = ageOn(birth, date)
+  if (age < 0 || view === 'years') return age
+  const months = (date.year - birth.year) * 12 + (date.month - birth.month) - (date.day < birth.day ? 1 : 0)
+  return months
+}
+
+/** The first and last dates covered by a box in a view. */
+export function boxRange(view: View, birth: CalendarDate, index: number): { start: CalendarDate; end: CalendarDate } {
+  if (view === 'weeks') return weekRange(birth, index)
+  const startOf = (i: number) =>
+    view === 'years' ? birthdayIn(birth, birth.year + i) : monthiversary(birth, i)
+  return { start: startOf(index), end: fromDayNumber(dayNumber(startOf(index + 1)) - 1) }
+}
