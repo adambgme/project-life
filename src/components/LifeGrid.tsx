@@ -1,11 +1,20 @@
-import { memo, useRef, useState, type KeyboardEvent } from 'react'
+import { memo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { BOXES_PER_YEAR, boxIndex, boxRange, type CalendarDate, type View } from '../life/lifeMaths'
+import type { BoxStory, Era, Moment } from '../life/story'
 
 type Props = {
   view: View
   birthDate: CalendarDate | null
   today: CalendarDate
   years: number
+  /** Eras and moments by box (from layoutStory). */
+  story: Map<number, BoxStory>
+  eras: Map<string, Era>
+  moments: Map<string, Moment>
+  /** CSS colour for an era or moment. */
+  colourOf: (entry: Era | Moment) => string
+  /** Open a box (click, tap or Enter); absent when the grid is read-only. */
+  onOpenBox?: (index: number) => void
 }
 
 type Layout = {
@@ -67,8 +76,39 @@ function cellLabel(view: View, index: number, birthDate: CalendarDate | null, to
   return label
 }
 
+/** What's in a box, in words: "Uni, Living in Leeds; moment: Graduated". */
+function storyLabel(box: BoxStory | undefined, eras: Map<string, Era>, moments: Map<string, Moment>): string {
+  if (!box) return ''
+  const parts = []
+  if (box.eras.length) parts.push(box.eras.map((id) => eras.get(id)?.label).join(', '))
+  if (box.moments.length) {
+    const names = box.moments.map((id) => moments.get(id)?.label).join(', ')
+    parts.push(`${box.moments.length === 1 ? 'moment' : 'moments'}: ${names}`)
+  }
+  return parts.join('; ')
+}
+
+/** Era colour fill (faded for boxes still ahead) with thin stripes for overlapping eras, and a dot for moments. */
+function storyStyle(
+  box: BoxStory | undefined,
+  state: string,
+  eras: Map<string, Era>,
+  colourOf: Props['colourOf'],
+): CSSProperties | undefined {
+  if (!box || box.eras.length === 0 || state === 'today') return undefined
+  const [top, ...others] = box.eras.map((id) => colourOf(eras.get(id)!))
+  const fill = state === 'ahead' ? `color-mix(in srgb, ${top} 35%, transparent)` : top
+  const stripes = others.slice(0, 2).map((c, i) => `${c} ${i * 25}% ${(i + 1) * 25}%`)
+  return {
+    backgroundColor: fill,
+    borderColor: top,
+    backgroundImage: stripes.length ? `linear-gradient(to top, ${stripes.join(', ')}, transparent ${stripes.length * 25}%)` : undefined,
+  }
+}
+
 /** The life grid for one view: a keyboard-navigable ARIA grid with one tab stop (ADR 0001). */
-export const LifeGrid = memo(function LifeGrid({ view, birthDate, today, years }: Props) {
+export const LifeGrid = memo(function LifeGrid(props: Props) {
+  const { view, birthDate, today, years, story, eras, moments, colourOf, onOpenBox } = props
   const layout = LAYOUTS[view]
   const perYear = BOXES_PER_YEAR[view]
   const total = years * perYear
@@ -79,6 +119,9 @@ export const LifeGrid = memo(function LifeGrid({ view, birthDate, today, years }
   const activeIndex =
     focus?.view === view ? Math.min(focus.index, total - 1) : Math.max(0, Math.min(todayIndex, total - 1))
   const gridRef = useRef<HTMLDivElement>(null)
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null)
+  const [focusWithin, setFocusWithin] = useState(false)
+  const detailIndex = hoverIndex ?? (focusWithin ? activeIndex : null)
 
   function moveTo(index: number) {
     const next = Math.max(0, Math.min(total - 1, index))
@@ -97,6 +140,11 @@ export const LifeGrid = memo(function LifeGrid({ view, birthDate, today, years }
       End: e.ctrlKey ? total - 1 : rowStart + layout.perRow - 1,
       PageDown: activeIndex + perYear * 10,
       PageUp: activeIndex - perYear * 10,
+    }
+    if ((e.key === 'Enter' || e.key === ' ') && onOpenBox) {
+      e.preventDefault()
+      onOpenBox(activeIndex)
+      return
     }
     const target = moves[e.key]
     if (target === undefined) return
@@ -130,6 +178,12 @@ export const LifeGrid = memo(function LifeGrid({ view, birthDate, today, years }
           ))}
         </div>
       )}
+      <p aria-hidden className="min-h-5 truncate text-xs text-ink-soft" data-testid="box-details">
+        {detailIndex !== null &&
+          [cellLabel(view, detailIndex, birthDate, todayIndex), storyLabel(story.get(detailIndex), eras, moments)]
+            .filter(Boolean)
+            .join(' · ')}
+      </p>
       <div
         ref={gridRef}
         role="grid"
@@ -138,6 +192,9 @@ export const LifeGrid = memo(function LifeGrid({ view, birthDate, today, years }
         aria-colcount={layout.perRow}
         className={`flex flex-col ${layout.gap}`}
         onKeyDown={onKeyDown}
+        onFocus={() => setFocusWithin(true)}
+        onBlur={() => setFocusWithin(false)}
+        onMouseLeave={() => setHoverIndex(null)}
       >
         {Array.from({ length: rows }, (_, row) => {
           const ageAtRow = row * yearsPerRow
@@ -155,6 +212,8 @@ export const LifeGrid = memo(function LifeGrid({ view, birthDate, today, years }
                 {Array.from({ length: Math.min(layout.perRow, total - row * layout.perRow) }, (_, col) => {
                   const index = row * layout.perRow + col
                   const state = index === todayIndex ? 'today' : index < todayIndex ? 'lived' : 'ahead'
+                  const box = story.get(index)
+                  const about = storyLabel(box, eras, moments)
                   return (
                     <div
                       key={col}
@@ -163,10 +222,21 @@ export const LifeGrid = memo(function LifeGrid({ view, birthDate, today, years }
                       data-index={index}
                       data-state={state}
                       tabIndex={index === activeIndex ? 0 : -1}
-                      aria-label={cellLabel(view, index, birthDate, todayIndex)}
-                      onClick={() => setFocus({ view, index })}
+                      aria-label={cellLabel(view, index, birthDate, todayIndex) + (about ? `. ${about}` : '')}
+                      data-eras={box?.eras.length || undefined}
+                      data-moments={box?.moments.length || undefined}
+                      style={storyStyle(box, state, eras, colourOf)}
+                      onMouseEnter={() => setHoverIndex(index)}
+                      onClick={() => {
+                        setFocus({ view, index })
+                        onOpenBox?.(index)
+                      }}
                       className={
-                        'aspect-square border ' +
+                        'relative aspect-square border ' +
+                        (onOpenBox ? 'cursor-pointer ' : '') +
+                        (box?.moments.length
+                          ? "after:absolute after:inset-[28%] after:rounded-full after:bg-paper after:ring-1 after:ring-ink after:content-[''] "
+                          : '') +
                         (view === 'years' ? 'rounded-[3px] ' : 'rounded-[1px] ') +
                         (state === 'lived'
                           ? 'border-accent bg-accent'

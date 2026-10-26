@@ -1,9 +1,11 @@
 /**
  * The saved life, kept only in this browser's localStorage. Versioned so later releases can
- * migrate it: v1 held the birth date; v2 adds sex, nation, basis and grid length. Works (in memory) when storage is unavailable.
+ * migrate it: v1 held the birth date; v2 added sex, nation, basis and grid length; v3 adds the story (eras, moments
+ * and category colours). Works (in memory) when storage is unavailable.
  */
-import { birthDateProblem, isRealDate, type CalendarDate } from './lifeMaths'
+import { birthDateProblem, parseIsoDate, toIsoDate, type CalendarDate } from './lifeMaths'
 import type { Basis, Sex } from './mortality'
+import { CATEGORIES, type Category, type Era, type Moment } from './story'
 
 export const NATIONS = ['uk', 'england', 'wales', 'scotland', 'northern-ireland'] as const
 export type Nation = (typeof NATIONS)[number]
@@ -17,7 +19,13 @@ export type Profile = {
   /** Years on the grid chosen by the person; null follows the statistics. */
   gridYears: number | null
 }
-export type Life = { profile: Profile | null }
+export type Life = {
+  profile: Profile | null
+  eras: Era[]
+  moments: Moment[]
+  /** Colours the person has chosen for categories (hex), over the defaults. */
+  colours: Partial<Record<Category, string>>
+}
 
 export const MIN_GRID_YEARS = 40
 export const MAX_GRID_YEARS = 120
@@ -30,23 +38,26 @@ export function newProfile(birthDate: CalendarDate): Profile {
 type SavedLifeV1 = { version: 1; profile: { birthDate: string } | null }
 type SavedProfileV2 = { birthDate: string; sex: Sex; nation: Nation; basis: Basis; gridYears: number | null }
 type SavedLifeV2 = { version: 2; profile: SavedProfileV2 | null }
+type SavedEra = { id: string; label: string; category: Category; start: string; end: string | null }
+type SavedMoment = { id: string; label: string; category: Category; date: string }
+type SavedLifeV3 = {
+  version: 3
+  profile: SavedProfileV2 | null
+  eras: SavedEra[]
+  moments: SavedMoment[]
+  colours: Partial<Record<Category, string>>
+}
 
 export const STORAGE_KEY = 'your-life'
 /** Written by the original bryanbraun/your-life page: `{ month: '0'–'11', day, year }` as strings. */
 const LEGACY_DOB_KEY = 'DOB'
 
-export const emptyLife: Life = { profile: null }
+export const emptyLife: Life = { profile: null, eras: [], moments: [], colours: {} }
 
-function toIso({ year, month, day }: CalendarDate): string {
-  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-}
+export const MAX_LABEL_LENGTH = 80
 
-function fromIso(iso: string): CalendarDate | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
-  if (!match) return null
-  const date = { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) }
-  return isRealDate(date) ? date : null
-}
+const toIso = toIsoDate
+const fromIso = parseIsoDate
 
 function getStorage(): Storage | null {
   try {
@@ -79,15 +90,43 @@ function readLegacyDob(storage: Storage, today: CalendarDate): CalendarDate | nu
 const oneOf = <T extends string>(value: unknown, options: readonly T[], fallback: T): T =>
   options.includes(value as T) ? (value as T) : fallback
 
+const isLabel = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim() !== '' && value.length <= MAX_LABEL_LENGTH
+const HEX = /^#[0-9a-f]{6}$/i
+
+/** Keep only well-formed entries: a bad one is dropped rather than breaking the page. */
+function parseStory(saved: Partial<SavedLifeV3>): Pick<Life, 'eras' | 'moments' | 'colours'> {
+  const eras: Era[] = []
+  for (const e of Array.isArray(saved.eras) ? saved.eras : []) {
+    const start = typeof e?.start === 'string' ? fromIso(e.start) : null
+    const end = e?.end === null ? null : typeof e?.end === 'string' ? fromIso(e.end) : undefined
+    if (typeof e?.id !== 'string' || !isLabel(e.label) || !start || end === undefined) continue
+    eras.push({ id: e.id, label: e.label, category: oneOf(e.category, CATEGORIES, 'other'), start, end })
+  }
+  const moments: Moment[] = []
+  for (const m of Array.isArray(saved.moments) ? saved.moments : []) {
+    const date = typeof m?.date === 'string' ? fromIso(m.date) : null
+    if (typeof m?.id !== 'string' || !isLabel(m.label) || !date) continue
+    moments.push({ id: m.id, label: m.label, category: oneOf(m.category, CATEGORIES, 'other'), date })
+  }
+  const colours: Life['colours'] = {}
+  for (const category of CATEGORIES) {
+    const colour = saved.colours?.[category]
+    if (typeof colour === 'string' && HEX.test(colour)) colours[category] = colour
+  }
+  return { eras, moments, colours }
+}
+
 function parse(raw: string | null): Life | null {
   if (!raw) return null
   try {
-    const saved = JSON.parse(raw) as SavedLifeV1 | SavedLifeV2
-    if (saved.version !== 1 && saved.version !== 2) return null
+    const saved = JSON.parse(raw) as SavedLifeV1 | SavedLifeV2 | SavedLifeV3
+    if (saved.version !== 1 && saved.version !== 2 && saved.version !== 3) return null
+    const story = saved.version === 3 ? parseStory(saved) : { eras: [], moments: [], colours: {} }
     const birthDate = saved.profile ? fromIso(saved.profile.birthDate) : null
-    if (!birthDate) return { profile: null }
+    if (!birthDate) return { profile: null, ...story }
     const profile = newProfile(birthDate)
-    if (saved.version === 2 && saved.profile) {
+    if (saved.version !== 1 && saved.profile) {
       profile.sex = oneOf(saved.profile.sex, ['male', 'female', 'both'] as const, 'both')
       profile.nation = oneOf(saved.profile.nation, NATIONS, 'uk')
       profile.basis = oneOf(saved.profile.basis, ['cohort', 'period'] as const, 'cohort')
@@ -95,7 +134,7 @@ function parse(raw: string | null): Life | null {
       profile.gridYears =
         Number.isInteger(years) && years! >= MIN_GRID_YEARS && years! <= MAX_GRID_YEARS ? years : null
     }
-    return { profile }
+    return { profile, ...story }
   } catch {
     return null
   }
@@ -112,21 +151,27 @@ export function loadLife(today: CalendarDate): LoadedLife {
   const legacy = readLegacyDob(storage, today)
   storage.removeItem(LEGACY_DOB_KEY)
   if (!legacy) return { life: emptyLife, storageAvailable: true }
-  const life = { profile: newProfile(legacy) }
+  const life = { ...emptyLife, profile: newProfile(legacy) }
   saveLife(life)
   return { life, storageAvailable: true }
 }
 
-/** Save the life; returns false when storage is unavailable. Clearing the profile removes the save. */
+/** Save the life; returns false when storage is unavailable. An empty life removes the save. */
 export function saveLife(life: Life): boolean {
   const storage = getStorage()
   if (!storage) return false
-  if (!life.profile) {
+  if (!life.profile && life.eras.length === 0 && life.moments.length === 0 && Object.keys(life.colours).length === 0) {
     storage.removeItem(STORAGE_KEY)
     return true
   }
-  const { birthDate, ...rest } = life.profile
-  const saved: SavedLifeV2 = { version: 2, profile: { birthDate: toIso(birthDate), ...rest } }
+  const profile = life.profile && { ...life.profile, birthDate: toIso(life.profile.birthDate) }
+  const saved: SavedLifeV3 = {
+    version: 3,
+    profile,
+    eras: life.eras.map((e) => ({ ...e, start: toIso(e.start), end: e.end && toIso(e.end) })),
+    moments: life.moments.map((m) => ({ ...m, date: toIso(m.date) })),
+    colours: life.colours,
+  }
   storage.setItem(STORAGE_KEY, JSON.stringify(saved))
   return true
 }

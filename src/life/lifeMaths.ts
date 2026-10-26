@@ -116,3 +116,16 @@ export function boxRange(view: View, birth: CalendarDate, index: number): { star
     view === 'years' ? birthdayIn(birth, birth.year + i) : monthiversary(birth, i)
   return { start: startOf(index), end: fromDayNumber(dayNumber(startOf(index + 1)) - 1) }
 }
+
+/** `YYYY-MM-DD`, as used by date inputs and the saved data. */
+export function toIsoDate({ year, month, day }: CalendarDate): string {
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+/** Parse `YYYY-MM-DD`; null unless it's a real date. */
+export function parseIsoDate(iso: string): CalendarDate | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  if (!match) return null
+  const date = { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) }
+  return isRealDate(date) ? date : null
+}

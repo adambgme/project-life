@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 // 26 Oct 2026, midday in London. Someone born 15 Jun 1990 is 36, and 133 days past their birthday
 // (week 19 of the row), so 36 × 52 + 19 = 1,891 weeks are fully lived and box 1,891 is this week.
@@ -49,7 +50,7 @@ test('an impossible date is explained and not used', async ({ page }) => {
 test('forgetting the date clears the grid and the saved copy', async ({ page }) => {
   await page.goto('./')
   await enterBirthDate(page, '15', 'June', '1990')
-  await page.getByRole('button', { name: 'Forget my date' }).click()
+  await page.getByRole('button', { name: 'Forget me' }).click()
   await expect(example(page)).toBeVisible()
   await page.reload()
   await expect(page.getByLabel('Year', { exact: true })).toHaveValue('')
@@ -89,7 +90,7 @@ test('forgetting a date carried over from the old site sticks', async ({ page })
   })
   await page.goto('./')
   await expect(page.locator('[data-state="lived"]')).toHaveCount(LIVED)
-  await page.getByRole('button', { name: 'Forget my date' }).click()
+  await page.getByRole('button', { name: 'Forget me' }).click()
   await page.reload()
   await expect(page.getByLabel('Year', { exact: true })).toHaveValue('')
   await expect(example(page)).toBeVisible()
@@ -256,10 +257,22 @@ test('a date saved by the first version of the new app keeps working', async ({ 
   await expect(page.getByLabel('Where you live')).toHaveValue('uk')
 })
 
-test('if a nation\'s figures fail to load, the page says the UK\'s are shown', async ({ page }) => {
+test('if a nation\'s figures fail to load, the page says the UK\'s are shown', async ({ page, pageErrors }) => {
   await page.route(/scotland-.*\.js$/, (route) => route.abort())
   await page.goto('./')
   await enterBirthDate(page, '15', 'June', '1990')
   await page.getByLabel('Where you live').selectOption('scotland')
   await expect(page.getByRole('status')).toContainText("The figures for Scotland couldn't be loaded, so these are the UK's.")
+  // The blocked download is expected to log a failed request; nothing else may.
+  const unexpected = pageErrors.filter((e) => !e.includes('Failed to load resource'))
+  pageErrors.splice(0, pageErrors.length, ...unexpected)
+})
+
+test('the example life shows a made-up story that can\'t be edited', async ({ page }) => {
+  await page.goto('./')
+  await expect(page.locator('[data-eras]').first()).toBeVisible()
+  await expect(page.getByTestId('legend')).toContainText('Education')
+  await page.locator('[data-index="1000"]').click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Your story' })).toHaveCount(0)
 })
