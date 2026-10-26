@@ -76,3 +76,37 @@ body {
     animation: none !important;
   }
 }
+
+/* Printing: one page (the poster's width is set just before printing), colours kept, white paper. */
+@media print {
+  /* Always the light theme on paper, even when the screen is dark. */
+  :root {
+    --color-paper: #f5efe3;
+    --color-paper-deep: #ebe3d3;
+    --color-ink: #2a2520;
+    --color-ink-soft: #5c5348;
+    --color-rule: #cfc4b0;
+    --color-accent: #3f6b45;
+    --color-accent-ink: #2d5233;
+    --color-today: #b4532a;
+    --color-error: #9c2f1d;
+    --color-cat-home: #b85c38;
+    --color-cat-work: #3e5f8a;
+    --color-cat-education: #9c7020;
+    --color-cat-relationships: #a9466a;
+    --color-cat-travel: #2f7f7c;
+    --color-cat-health: #6f4a8e;
+    --color-cat-other: #6e675e;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  html,
+  body {
+    background: white;
+  }
+  dialog {
+    display: none;
+  }
+}

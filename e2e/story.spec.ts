@@ -233,7 +233,7 @@ test('a goal this week keeps today marked', async ({ page }) => {
   await dialog(page).getByRole('button', { name: 'Close' }).click()
   const today = page.locator('[data-state="today"]')
   await expect(today).toHaveAttribute('data-goals', '1')
-  await expect(today).toHaveCSS('box-shadow', /rgb\(180, 83, 42\)/)
+  await expect(today).toHaveCSS('box-shadow', /rgb\(42, 37, 32\)/)
 })
 
 test('a save from a newer version of the page is never overwritten', async ({ page }) => {

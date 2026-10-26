@@ -66,3 +66,12 @@ test('an era or goal on a marked box keeps the 1-in-2 mark', async ({ page }) =>
   await expect(box).toHaveAttribute('data-goals', '1')
   await expect(box).toHaveCSS('outline-style', 'solid')
 })
+
+test('with the chances column, the week numbers still line up with the boxes', async ({ page }) => {
+  await page.getByRole('radio', { name: 'Show my chances on the grid' }).check()
+  const marks = page.getByTestId('column-marks')
+  const firstRow = page.locator('[role="row"]').first()
+  const [m, r] = await Promise.all([marks.boundingBox(), firstRow.boundingBox()])
+  expect(Math.abs(m!.x - r!.x)).toBeLessThan(1)
+  expect(Math.abs(m!.width - r!.width)).toBeLessThan(1)
+})
