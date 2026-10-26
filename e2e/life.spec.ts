@@ -23,14 +23,14 @@ async function enterBirthDate(page: Page, day: string, month: string, year: stri
 test('entering a date of birth fills the weeks lived, and it is remembered', async ({ page }) => {
   await page.goto('./')
   await expect(example(page)).toBeVisible()
-  await expect(page.getByTestId('summary')).toHaveText('Sam has lived 1,905 weeks, of the 4,680 on a 90-year grid.')
+  await expect(page.getByTestId('summary')).toHaveText('Sam has lived 1,905 weeks, of the 5,200 on a 100-year grid.')
   await expect(page.locator('[data-state="lived"]')).toHaveCount(EXAMPLE_LIVED)
   expect(await page.evaluate(() => localStorage.getItem('your-life'))).toBeNull()
 
   await enterBirthDate(page, '15', 'June', '1990')
 
   await expect(example(page)).toBeHidden()
-  await expect(page.getByTestId('summary')).toHaveText("You've lived 1,891 weeks, of the 4,680 on a 90-year grid.")
+  await expect(page.getByTestId('summary')).toHaveText("You've lived 1,891 weeks, of the 5,200 on a 100-year grid.")
   await expect(page.locator('[data-state="lived"]')).toHaveCount(LIVED)
   await expect(page.locator('[data-state="today"]')).toHaveAttribute('data-index', String(LIVED))
 
@@ -168,7 +168,7 @@ test('years, months and weeks views, each with today marked, remembered in the a
   await page.getByRole('radio', { name: 'Months' }).check({ force: true })
   await expect(page).toHaveURL(/\?view=months$/)
   await expect(page.getByRole('grid')).toHaveAccessibleName('Your life in months: three years per row')
-  await expect(page.getByTestId('summary')).toHaveText("You've lived 436 months, of the 1,080 on a 90-year grid.")
+  await expect(page.getByTestId('summary')).toHaveText("You've lived 436 months, of the 1,200 on a 100-year grid.")
   await expect(page.locator('[data-state="lived"]')).toHaveCount(436)
   await expect(page.locator('[data-state="today"]')).toHaveAccessibleName(
     'Age 36, month 5: 15 Oct 2026 to 14 Nov 2026, this month',
@@ -196,4 +196,70 @@ test('the old page addresses still work', async ({ page }) => {
   await page.goto('weeks.html')
   await expect(page).toHaveURL(/\/project-life\/$/)
   await expect(page.getByRole('radio', { name: 'Weeks' })).toBeChecked()
+})
+
+test('the grid length comes from ONS life tables, and can be set by hand', async ({ page }) => {
+  await page.goto('./')
+  await enterBirthDate(page, '15', 'June', '1990')
+  const years = page.getByLabel('Grid length (years)')
+  const summary = page.getByTestId('summary')
+  const expectancy = page.getByTestId('life-expectancy')
+
+  // UK, both sexes averaged, cohort: the statistics suggest 100 years.
+  await expect(years).toHaveValue('100')
+  await expect(page.locator('[role="gridcell"]')).toHaveCount(100 * 52)
+  await expect(expectancy).toContainText('People like you live to about')
+  await expect(expectancy).toContainText('in 100 people like you reach')
+
+  // Different tables give different figures, and other nations load on demand.
+  const before = await expectancy.textContent()
+  await page.getByLabel('Life tables for').selectOption('male')
+  await page.getByLabel('Where you live').selectOption('scotland')
+  await expect(expectancy).not.toHaveText(before!)
+  const cohort = await expectancy.textContent()
+  await page.getByRole('radio', { name: "This year's (period)" }).check()
+  await expect(expectancy).not.toHaveText(cohort!)
+
+  // Typing a new length works keystroke by keystroke, and too short a length (at or below your age) is refused.
+  const suggested = await years.inputValue()
+  await years.fill('9')
+  await expect(years).toHaveValue('9')
+  await expect(page.getByText('The grid can run from 40 to 120 years.')).toBeVisible()
+  await years.press('Enter')
+  await expect(years).toHaveValue(suggested)
+  await years.fill('36')
+  await years.blur()
+  await expect(years).toHaveValue(suggested)
+
+  // A hand-set length sticks, and can be undone.
+  await years.fill('90')
+  await years.press('Enter')
+  await expect(summary).toHaveText("You've lived 1,891 weeks, of the 4,680 on a 90-year grid.")
+  await expect(page.locator('[role="gridcell"]')).toHaveCount(90 * 52)
+  await page.reload()
+  await expect(years).toHaveValue('90')
+  await expect(page.getByLabel('Where you live')).toHaveValue('scotland')
+  await page.getByRole('button', { name: /Use the figures/ }).click()
+  await expect(page.getByRole('button', { name: /Use the figures/ })).toBeHidden()
+})
+
+test('a date saved by the first version of the new app keeps working', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('seeded')) {
+      sessionStorage.setItem('seeded', '1')
+      localStorage.setItem('your-life', JSON.stringify({ version: 1, profile: { birthDate: '1990-06-15' } }))
+    }
+  })
+  await page.goto('./')
+  await expect(page.locator('[data-state="lived"]')).toHaveCount(LIVED)
+  await expect(page.getByLabel('Life tables for')).toHaveValue('both')
+  await expect(page.getByLabel('Where you live')).toHaveValue('uk')
+})
+
+test('if a nation\'s figures fail to load, the page says the UK\'s are shown', async ({ page }) => {
+  await page.route(/scotland-.*\.js$/, (route) => route.abort())
+  await page.goto('./')
+  await enterBirthDate(page, '15', 'June', '1990')
+  await page.getByLabel('Where you live').selectOption('scotland')
+  await expect(page.getByRole('status')).toContainText("The figures for Scotland couldn't be loaded, so these are the UK's.")
 })

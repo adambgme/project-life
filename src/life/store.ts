@@ -1,13 +1,35 @@
 /**
  * The saved life, kept only in this browser's localStorage. Versioned so later releases can
- * migrate it; v1 holds just the profile. Works (in memory) when storage is unavailable.
+ * migrate it: v1 held the birth date; v2 adds sex, nation, basis and grid length. Works (in memory) when storage is unavailable.
  */
 import { birthDateProblem, isRealDate, type CalendarDate } from './lifeMaths'
+import type { Basis, Sex } from './mortality'
 
-export type Profile = { birthDate: CalendarDate }
+export const NATIONS = ['uk', 'england', 'wales', 'scotland', 'northern-ireland'] as const
+export type Nation = (typeof NATIONS)[number]
+
+export type Profile = {
+  birthDate: CalendarDate
+  /** Which ONS tables to use: male, female, or both averaged. */
+  sex: Sex
+  nation: Nation
+  basis: Basis
+  /** Years on the grid chosen by the person; null follows the statistics. */
+  gridYears: number | null
+}
 export type Life = { profile: Profile | null }
 
+export const MIN_GRID_YEARS = 40
+export const MAX_GRID_YEARS = 120
+
+/** Details for someone who has only entered a birth date. */
+export function newProfile(birthDate: CalendarDate): Profile {
+  return { birthDate, sex: 'both', nation: 'uk', basis: 'cohort', gridYears: null }
+}
+
 type SavedLifeV1 = { version: 1; profile: { birthDate: string } | null }
+type SavedProfileV2 = { birthDate: string; sex: Sex; nation: Nation; basis: Basis; gridYears: number | null }
+type SavedLifeV2 = { version: 2; profile: SavedProfileV2 | null }
 
 export const STORAGE_KEY = 'your-life'
 /** Written by the original bryanbraun/your-life page: `{ month: '0'–'11', day, year }` as strings. */
@@ -54,13 +76,26 @@ function readLegacyDob(storage: Storage, today: CalendarDate): CalendarDate | nu
   }
 }
 
+const oneOf = <T extends string>(value: unknown, options: readonly T[], fallback: T): T =>
+  options.includes(value as T) ? (value as T) : fallback
+
 function parse(raw: string | null): Life | null {
   if (!raw) return null
   try {
-    const saved = JSON.parse(raw) as SavedLifeV1
-    if (saved.version !== 1) return null
+    const saved = JSON.parse(raw) as SavedLifeV1 | SavedLifeV2
+    if (saved.version !== 1 && saved.version !== 2) return null
     const birthDate = saved.profile ? fromIso(saved.profile.birthDate) : null
-    return { profile: birthDate ? { birthDate } : null }
+    if (!birthDate) return { profile: null }
+    const profile = newProfile(birthDate)
+    if (saved.version === 2 && saved.profile) {
+      profile.sex = oneOf(saved.profile.sex, ['male', 'female', 'both'] as const, 'both')
+      profile.nation = oneOf(saved.profile.nation, NATIONS, 'uk')
+      profile.basis = oneOf(saved.profile.basis, ['cohort', 'period'] as const, 'cohort')
+      const years = saved.profile.gridYears
+      profile.gridYears =
+        Number.isInteger(years) && years! >= MIN_GRID_YEARS && years! <= MAX_GRID_YEARS ? years : null
+    }
+    return { profile }
   } catch {
     return null
   }
@@ -77,7 +112,7 @@ export function loadLife(today: CalendarDate): LoadedLife {
   const legacy = readLegacyDob(storage, today)
   storage.removeItem(LEGACY_DOB_KEY)
   if (!legacy) return { life: emptyLife, storageAvailable: true }
-  const life = { profile: { birthDate: legacy } }
+  const life = { profile: newProfile(legacy) }
   saveLife(life)
   return { life, storageAvailable: true }
 }
@@ -90,7 +125,8 @@ export function saveLife(life: Life): boolean {
     storage.removeItem(STORAGE_KEY)
     return true
   }
-  const saved: SavedLifeV1 = { version: 1, profile: { birthDate: toIso(life.profile.birthDate) } }
+  const { birthDate, ...rest } = life.profile
+  const saved: SavedLifeV2 = { version: 2, profile: { birthDate: toIso(birthDate), ...rest } }
   storage.setItem(STORAGE_KEY, JSON.stringify(saved))
   return true
 }
