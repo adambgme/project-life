@@ -10,6 +10,10 @@ type Props = {
   birthDate: CalendarDate | null
   today: CalendarDate
   onChange: (birthDate: CalendarDate | null) => void
+  /** Whether there's anything saved to forget. */
+  canForget: boolean
+  /** Delete everything saved in this browser; returns false if the person changed their mind. */
+  onForget: () => boolean
 }
 
 type Fields = { day: string; month: string; year: string }
@@ -29,7 +33,7 @@ function check(fields: Fields, today: CalendarDate): { date: CalendarDate } | { 
 
 /** Date of birth in UK order (day, month, year). The grid follows the form: a complete, valid date is saved, and
  * anything else (incomplete, impossible or empty) clears it, so the grid never shows a date the form doesn't. */
-export function BirthDateForm({ birthDate, today, onChange }: Props) {
+export function BirthDateForm({ birthDate, today, onChange, canForget, onForget }: Props) {
   const id = useId()
   const [fields, setFields] = useState(() => fieldsFrom(birthDate))
   const result = check(fields, today)
@@ -42,9 +46,8 @@ export function BirthDateForm({ birthDate, today, onChange }: Props) {
     onChange(checked && 'date' in checked ? checked.date : null)
   }
 
-  function clear() {
-    setFields(fieldsFrom(null))
-    onChange(null)
+  function forget() {
+    if (onForget()) setFields(fieldsFrom(null))
   }
 
   const input =
@@ -110,13 +113,13 @@ export function BirthDateForm({ birthDate, today, onChange }: Props) {
             aria-invalid={!!error}
           />
         </div>
-        {birthDate && (
+        {canForget && (
           <button
             type="button"
-            onClick={clear}
+            onClick={forget}
             className="pb-2 text-sm text-ink-soft underline decoration-rule underline-offset-4 hover:text-ink"
           >
-            Forget my date
+            Forget me
           </button>
         )}
       </fieldset>

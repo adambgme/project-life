@@ -14,6 +14,19 @@
   --color-accent-ink: #2d5233;
   --color-today: #b4532a;
   --color-error: #9c2f1d;
+
+}
+
+/* Story categories: warm, distinct, at least 3:1 against paper. Plain variables, not @theme: they are only used from
+   inline styles, and Tailwind leaves out theme variables that no utility class uses. */
+:root {
+  --color-cat-home: #b85c38;
+  --color-cat-work: #3e5f8a;
+  --color-cat-education: #9c7020;
+  --color-cat-relationships: #a9466a;
+  --color-cat-travel: #2f7f7c;
+  --color-cat-health: #6f4a8e;
+  --color-cat-other: #6e675e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -27,6 +40,14 @@
     --color-accent-ink: #b5dbb1;
     --color-today: #e58a5c;
     --color-error: #f0937c;
+
+    --color-cat-home: #e08a63;
+    --color-cat-work: #86a8d6;
+    --color-cat-education: #d9ad5b;
+    --color-cat-relationships: #d97f9f;
+    --color-cat-travel: #6cc0bb;
+    --color-cat-health: #b18ad0;
+    --color-cat-other: #a89f93;
   }
 }
 
