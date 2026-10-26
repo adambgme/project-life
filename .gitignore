@@ -4,3 +4,4 @@ test-results/
 playwright-report/
 .scratch/
 BRIEF.md
+data-cache/

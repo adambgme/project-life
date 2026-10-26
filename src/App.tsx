@@ -2,15 +2,16 @@ import { useMemo, useState } from 'react'
 import { BirthDateForm } from './components/BirthDateForm'
 import { LifeGrid } from './components/LifeGrid'
 import { ViewToggle } from './components/ViewToggle'
+import { YourDetails } from './components/YourDetails'
 import { BOXES_PER_YEAR, boxIndex, calendarDateIn, type View } from './life/lifeMaths'
+import { chanceOfReaching, outlook, suggestedGridYears } from './life/mortality'
+import { MIN_GRID_YEARS, newProfile } from './life/store'
 import { useLife } from './life/useLife'
+import { useMortality } from './life/useMortality'
 import { readView, writeView } from './life/viewParam'
 
-/** Years shown on the grid until the life expectancy engine sets a default (T3). */
-const GRID_YEARS = 90
-
 /** A made-up life shown on a first visit, so the grid isn't empty. Never saved. */
-const EXAMPLE = { name: 'Sam', birthDate: { year: 1990, month: 3, day: 4 } }
+const EXAMPLE = { name: 'Sam', profile: newProfile({ year: 1990, month: 3, day: 4 }) }
 
 const UNIT: Record<View, string> = { weeks: 'weeks', months: 'months', years: 'years' }
 
@@ -20,11 +21,19 @@ export function App() {
   const today = useMemo(() => calendarDateIn(new Date(), viewerTimeZone), [])
   const { life, setLife, storageAvailable } = useLife(today)
   const [view, setView] = useState(() => readView(window.location.search))
-  const ownBirthDate = life.profile?.birthDate ?? null
-  const birthDate = ownBirthDate ?? EXAMPLE.birthDate
-  const isExample = !ownBirthDate
+  const isExample = !life.profile
+  const profile = life.profile ?? EXAMPLE.profile
+  const birthDate = profile.birthDate
+  const { data: mortality, status: mortalityStatus } = useMortality(profile.nation)
+  const personal = useMemo(
+    () => outlook(mortality, birthDate, today, { sex: profile.sex, basis: profile.basis }),
+    [mortality, birthDate, today, profile.sex, profile.basis],
+  )
+  const suggestedYears = suggestedGridYears(personal)
+  // A hand-set length the person has since outlived falls back to the figures.
+  const gridYears = profile.gridYears !== null && profile.gridYears > personal.fromAge ? profile.gridYears : suggestedYears
   const lived = Math.max(0, boxIndex(view, birthDate, today))
-  const total = (GRID_YEARS * BOXES_PER_YEAR[view]).toLocaleString('en-GB')
+  const total = (gridYears * BOXES_PER_YEAR[view]).toLocaleString('en-GB')
 
   function changeView(next: View) {
     setView(next)
@@ -51,10 +60,25 @@ export function App() {
 
       <main className="flex flex-col gap-6">
         <BirthDateForm
-          birthDate={ownBirthDate}
+          birthDate={life.profile?.birthDate ?? null}
           today={today}
-          onChange={(date) => setLife({ ...life, profile: date ? { birthDate: date } : null })}
+          onChange={(date) =>
+            setLife({ ...life, profile: date ? { ...(life.profile ?? newProfile(date)), birthDate: date } : null })
+          }
         />
+        {life.profile && (
+          <YourDetails
+            profile={life.profile}
+            suggestedYears={suggestedYears}
+            gridYears={gridYears}
+            minYears={Math.max(MIN_GRID_YEARS, personal.fromAge + 1)}
+            tablesStatus={mortalityStatus}
+            lifeExpectancy={personal.lifeExpectancy}
+            chanceAtEnd={chanceOfReaching(personal, gridYears)}
+            source={mortality.source}
+            onChange={(next) => setLife({ ...life, profile: next })}
+          />
+        )}
         <div className="flex flex-col gap-1">
           {isExample && (
             <p className="font-display text-sm tracking-[0.12em] text-today uppercase" data-testid="example">
@@ -64,14 +88,14 @@ export function App() {
           <p className="font-display text-xl" aria-live="polite" data-testid="summary">
             {isExample ? `${EXAMPLE.name} has` : "You've"} lived{' '}
             <strong className="font-semibold">{lived.toLocaleString('en-GB')}</strong> {UNIT[view]}
-            <span className="text-ink-soft">, of the {total} on a {GRID_YEARS}-year grid.</span>
+            <span className="text-ink-soft">, of the {total} on a {gridYears}-year grid.</span>
           </p>
           {isExample && (
             <p className="text-sm text-ink-soft">Enter your date of birth above to see your own. Nothing is saved until you do.</p>
           )}
         </div>
         <div className="flex justify-center">
-          <LifeGrid view={view} birthDate={birthDate} today={today} years={GRID_YEARS} />
+          <LifeGrid view={view} birthDate={birthDate} today={today} years={gridYears} />
         </div>
       </main>
 

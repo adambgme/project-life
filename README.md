@@ -20,6 +20,16 @@ npm run e2e        # browser journeys (Playwright, desktop + phone)
 npm run typecheck && npm run lint
 ```
 
+### Statistics
+
+Life tables come from the ONS (Open Government Licence v3.0); see `docs/adr/0002-life-tables.md`. The generated JSON
+in `src/data/` is committed. To refresh it:
+
+```sh
+npm run data:fetch   # downloads into data-cache/ (slow and polite: ONS rate-limits)
+npm run data:build   # parses, checks and writes src/data/mortality/*.json
+```
+
 ## Credit
 
 Forked from [bryanbraun/your-life](https://github.com/bryanbraun/your-life) (MIT), based on the
