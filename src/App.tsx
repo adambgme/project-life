@@ -10,10 +10,11 @@ import { YourDetails } from './components/YourDetails'
 import { EXAMPLE } from './life/example'
 import { BOXES_PER_YEAR, boxIndex, calendarDateIn, type View } from './life/lifeMaths'
 import { chanceOfReaching, outlook, suggestedGridYears } from './life/mortality'
-import { emptyLife, MIN_GRID_YEARS, newProfile } from './life/store'
+import { CLASSIC_GRID_YEARS, emptyLife, MIN_GRID_YEARS, newProfile } from './life/store'
 import { categoryColour, countdown, goalDate, layoutStory, weeksToGo, type Category } from './life/story'
 import { useLife } from './life/useLife'
 import { useMortality } from './life/useMortality'
+import { boxChances } from './life/gridChances'
 import { exportFile, readLinkFragment } from './life/transfer'
 import { readView, writeView } from './life/viewParam'
 
@@ -68,11 +69,19 @@ export function App() {
     () => outlook(mortality, birthDate, today, { sex: profile.sex, basis: profile.basis }),
     [mortality, birthDate, today, profile.sex, profile.basis],
   )
-  const suggestedYears = suggestedGridYears(personal)
+  // With statistics hidden the grid can't be sized from them (its length would give the figures away): use the
+  // classic 90 years unless the person chose a length.
+  const suggestedYears = profile.statistics === 'hidden' ? CLASSIC_GRID_YEARS : suggestedGridYears(personal)
   // A hand-set length the person has since outlived falls back to the figures.
   const gridYears = profile.gridYears !== null && profile.gridYears > personal.fromAge ? profile.gridYears : suggestedYears
   const lived = Math.max(0, boxIndex(view, birthDate, today))
   const total = (gridYears * BOXES_PER_YEAR[view]).toLocaleString('en-GB')
+  const showChances = !isExample && profile.statistics === 'grid'
+  const chances = useMemo(() => {
+    if (!showChances) return undefined
+    const variant = (v: 'low' | 'high') => outlook(mortality, birthDate, today, { sex: profile.sex, basis: profile.basis, variant: v })
+    return boxChances(view, birthDate, today, gridYears, { principal: personal, low: variant('low'), high: variant('high') })
+  }, [showChances, mortality, birthDate, today, profile.sex, profile.basis, view, gridYears, personal])
   const story = useMemo(
     () => layoutStory(view, birthDate, today, shown.eras, shown.moments, shown.goals),
     [view, birthDate, today, shown.eras, shown.moments, shown.goals],
@@ -217,10 +226,11 @@ export function App() {
             moments={momentsById}
             goals={goalsById}
             colourOf={colourOf}
+            chances={chances}
             onOpenBox={openBox}
           />
         </div>
-        <Legend eras={shown.eras} moments={shown.moments} goals={shown.goals} colours={colours} />
+        <Legend eras={shown.eras} moments={shown.moments} goals={shown.goals} colours={colours} chances={!!chances} />
         </>
         )}
         {life.profile && (

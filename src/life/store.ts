@@ -19,7 +19,12 @@ export type Profile = {
   basis: Basis
   /** Years on the grid chosen by the person; null follows the statistics. */
   gridYears: number | null
+  /** Just the numbers (default), shade the grid with the chance of being alive, or hide all statistics. */
+  statistics: Statistics
 }
+
+export const STATISTICS = ['numbers', 'grid', 'hidden'] as const
+export type Statistics = (typeof STATISTICS)[number]
 export type Life = {
   profile: Profile | null
   eras: Era[]
@@ -30,15 +35,25 @@ export type Life = {
 }
 
 export const MIN_GRID_YEARS = 40
+/** Wait But Why's 90 years: the grid length when statistics are hidden. */
+export const CLASSIC_GRID_YEARS = 90
 export const MAX_GRID_YEARS = 120
 
 /** Details for someone who has only entered a birth date. */
 export function newProfile(birthDate: CalendarDate): Profile {
-  return { birthDate, sex: 'both', nation: 'uk', basis: 'cohort', gridYears: null }
+  return { birthDate, sex: 'both', nation: 'uk', basis: 'cohort', gridYears: null, statistics: 'numbers' }
 }
 
 type SavedLifeV1 = { version: 1; profile: { birthDate: string } | null }
-type SavedProfileV2 = { birthDate: string; sex: Sex; nation: Nation; basis: Basis; gridYears: number | null }
+type SavedProfileV2 = {
+  birthDate: string
+  sex: Sex
+  nation: Nation
+  basis: Basis
+  gridYears: number | null
+  /** Added within v3; older code ignores it. */
+  statistics?: Statistics
+}
 type SavedLifeV2 = { version: 2; profile: SavedProfileV2 | null }
 type SavedEra = { id: string; label: string; category: Category; start: string; end: string | null }
 type SavedMoment = { id: string; label: string; category: Category; date: string }
@@ -159,6 +174,7 @@ function parse(raw: string | null): Life | null | typeof NEWER {
       profile.sex = oneOf(saved.profile.sex, ['male', 'female', 'both'] as const, 'both')
       profile.nation = oneOf(saved.profile.nation, NATIONS, 'uk')
       profile.basis = oneOf(saved.profile.basis, ['cohort', 'period'] as const, 'cohort')
+      profile.statistics = oneOf(saved.profile.statistics, STATISTICS, 'numbers')
       const years = saved.profile.gridYears
       profile.gridYears =
         Number.isInteger(years) && years! >= MIN_GRID_YEARS && years! <= MAX_GRID_YEARS ? years : null

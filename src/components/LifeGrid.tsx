@@ -1,5 +1,6 @@
 import { memo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { BOXES_PER_YEAR, boxIndex, boxRange, type CalendarDate, type View } from '../life/lifeMaths'
+import { chanceWords, type GridChances } from '../life/gridChances'
 import { countdown, goalDate, weeksToGo, type BoxStory, type Category, type Era, type Goal, type Moment } from '../life/story'
 
 type Props = {
@@ -14,6 +15,8 @@ type Props = {
   goals: Map<string, Goal>
   /** CSS colour for an entry's category. */
   colourOf: (entry: { category: Category }) => string
+  /** The statistics overlay, when shown. */
+  chances?: GridChances
   /** Open a box (click, tap or Enter); absent when the grid is read-only. */
   onOpenBox?: (index: number) => void
 }
@@ -79,6 +82,29 @@ function cellLabel(view: View, index: number, birthDate: CalendarDate | null, to
 
 type Lookup = { eras: Map<string, Era>; moments: Map<string, Moment>; goals: Map<string, Goal>; birth: CalendarDate | null; today: CalendarDate }
 
+/** "about 7 in 10 chance of being alive then", plus the 1-in-2 and 1-in-10 marks. */
+function chanceLabel(index: number, chances: GridChances | undefined, todayIndex: number): string {
+  if (!chances || index <= todayIndex) return ''
+  const p = chances.principal[index]!
+  const words = p >= 0.995 ? 'almost certainly alive then' : `${chanceWords(p)} chance of being alive then`
+  if (index === chances.half) return `${words}; about half of people like you live beyond here`
+  if (index === chances.tenth) return `${words}; about 1 in 10 people like you live beyond here`
+  return words
+}
+
+/** Future boxes fade with the chance of being alive; a soft tint shows where ONS's projections disagree. */
+function chanceStyle(index: number, chances: GridChances): CSSProperties {
+  const p = chances.principal[index]!
+  const spread = chances.high[index]! - chances.low[index]!
+  const marker = index === chances.half || index === chances.tenth
+  return {
+    borderColor: `color-mix(in srgb, var(--color-ink-soft) ${Math.round(15 + 85 * p)}%, transparent)`,
+    backgroundColor: spread > 0.02 ? `color-mix(in srgb, var(--color-accent) ${Math.round(Math.min(35, spread * 140))}%, transparent)` : undefined,
+    outline: marker ? '1.5px solid var(--color-ink)' : undefined,
+    outlineOffset: marker ? '1px' : undefined,
+  }
+}
+
 /** What's in a box, in words: "goal: Retire (1,233 weeks to go); Uni, Living in Leeds; moment: Graduated". */
 function storyLabel(box: BoxStory | undefined, { eras, moments, goals, birth, today }: Lookup): string {
   if (!box) return ''
@@ -123,7 +149,7 @@ function storyStyle(
 
 /** The life grid for one view: a keyboard-navigable ARIA grid with one tab stop (ADR 0001). */
 export const LifeGrid = memo(function LifeGrid(props: Props) {
-  const { view, birthDate, today, years, story, eras, moments, goals, colourOf, onOpenBox } = props
+  const { view, birthDate, today, years, story, eras, moments, goals, colourOf, chances, onOpenBox } = props
   const lookup: Lookup = { eras, moments, goals, birth: birthDate, today }
   const layout = LAYOUTS[view]
   const perYear = BOXES_PER_YEAR[view]
@@ -196,7 +222,11 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
       )}
       <p aria-hidden className="min-h-5 truncate text-xs text-ink-soft" data-testid="box-details">
         {detailIndex !== null &&
-          [cellLabel(view, detailIndex, birthDate, todayIndex), storyLabel(story.get(detailIndex), lookup)]
+          [
+            cellLabel(view, detailIndex, birthDate, todayIndex),
+            chanceLabel(detailIndex, chances, todayIndex),
+            storyLabel(story.get(detailIndex), lookup),
+          ]
             .filter(Boolean)
             .join(' · ')}
       </p>
@@ -214,6 +244,11 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
       >
         {Array.from({ length: rows }, (_, row) => {
           const ageAtRow = row * yearsPerRow
+          const rowStart = row * layout.perRow
+          const inRow = (i: number) => i >= rowStart && i < rowStart + layout.perRow
+          const mark = chances
+            ? [inRow(chances.half) && '1 in 2', inRow(chances.tenth) && '1 in 10'].filter(Boolean).join(' · ')
+            : ''
           return (
             <div key={row} className={`flex items-center ${row > 0 && ageAtRow % layout.breakEvery === 0 ? 'mt-1.5' : ''}`}>
               <span aria-hidden className="w-8 shrink-0 pr-2 text-right text-[10px] leading-none text-ink-soft tabular-nums">
@@ -229,7 +264,11 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
                   const index = row * layout.perRow + col
                   const state = index === todayIndex ? 'today' : index < todayIndex ? 'lived' : 'ahead'
                   const box = story.get(index)
-                  const about = storyLabel(box, lookup)
+                  const about = [chanceLabel(index, chances, todayIndex), storyLabel(box, lookup)].filter(Boolean).join('. ')
+                  const storyLook = storyStyle(box, state, lookup, colourOf)
+                  // The chances overlay sits under any era or goal styling, so its marks stay visible.
+                  const chanceLook = chances && state === 'ahead' ? chanceStyle(index, chances) : undefined
+                  const look = chanceLook || storyLook ? { ...chanceLook, ...storyLook } : undefined
                   return (
                     <div
                       key={col}
@@ -242,7 +281,8 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
                       data-eras={box?.eras.length || undefined}
                       data-moments={box?.moments.length || undefined}
                       data-goals={box?.goals.length || undefined}
-                      style={storyStyle(box, state, lookup, colourOf)}
+                      data-chance={chances && state === 'ahead' ? chances.principal[index]!.toFixed(3) : undefined}
+                      style={look}
                       onMouseEnter={() => setHoverIndex(index)}
                       onClick={() => {
                         setFocus({ view, index })
@@ -265,6 +305,11 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
                   )
                 })}
               </div>
+              {chances && (
+                <span aria-hidden className="w-10 shrink-0 pl-1.5 text-[10px] leading-none whitespace-nowrap text-ink-soft" data-testid={mark ? 'chance-mark' : undefined}>
+                  {mark}
+                </span>
+              )}
             </div>
           )
         })}
