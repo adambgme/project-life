@@ -1,11 +1,12 @@
 /**
  * The saved life, kept only in this browser's localStorage. Versioned so later releases can
- * migrate it: v1 held the birth date; v2 added sex, nation, basis and grid length; v3 adds the story (eras, moments
- * and category colours). Works (in memory) when storage is unavailable.
+ * migrate it: v1 held the birth date; v2 added sex, nation, basis and grid length; v3 added the story (eras, moments,
+ * category colours, and later goals as an optional field older v3 code ignores). A save from a newer version than this
+ * code knows is never overwritten. Works (in memory) when storage is unavailable.
  */
 import { birthDateProblem, parseIsoDate, toIsoDate, type CalendarDate } from './lifeMaths'
 import type { Basis, Sex } from './mortality'
-import { CATEGORIES, type Category, type Era, type Moment } from './story'
+import { CATEGORIES, type Category, type Era, type Goal, type Moment } from './story'
 
 export const NATIONS = ['uk', 'england', 'wales', 'scotland', 'northern-ireland'] as const
 export type Nation = (typeof NATIONS)[number]
@@ -23,6 +24,7 @@ export type Life = {
   profile: Profile | null
   eras: Era[]
   moments: Moment[]
+  goals: Goal[]
   /** Colours the person has chosen for categories (hex), over the defaults. */
   colours: Partial<Record<Category, string>>
 }
@@ -40,11 +42,19 @@ type SavedProfileV2 = { birthDate: string; sex: Sex; nation: Nation; basis: Basi
 type SavedLifeV2 = { version: 2; profile: SavedProfileV2 | null }
 type SavedEra = { id: string; label: string; category: Category; start: string; end: string | null }
 type SavedMoment = { id: string; label: string; category: Category; date: string }
+type SavedGoal = {
+  id: string
+  label: string
+  category: Category
+  target: { kind: 'date'; date: string } | { kind: 'age'; age: number }
+}
 type SavedLifeV3 = {
   version: 3
   profile: SavedProfileV2 | null
   eras: SavedEra[]
   moments: SavedMoment[]
+  /** Added after v3 shipped; optional so v3 code without goals still reads the rest. */
+  goals?: SavedGoal[]
   colours: Partial<Record<Category, string>>
 }
 
@@ -52,7 +62,7 @@ export const STORAGE_KEY = 'your-life'
 /** Written by the original bryanbraun/your-life page: `{ month: '0'–'11', day, year }` as strings. */
 const LEGACY_DOB_KEY = 'DOB'
 
-export const emptyLife: Life = { profile: null, eras: [], moments: [], colours: {} }
+export const emptyLife: Life = { profile: null, eras: [], moments: [], goals: [], colours: {} }
 
 export const MAX_LABEL_LENGTH = 80
 
@@ -95,7 +105,7 @@ const isLabel = (value: unknown): value is string =>
 const HEX = /^#[0-9a-f]{6}$/i
 
 /** Keep only well-formed entries: a bad one is dropped rather than breaking the page. */
-function parseStory(saved: Partial<SavedLifeV3>): Pick<Life, 'eras' | 'moments' | 'colours'> {
+function parseStory(saved: Partial<SavedLifeV3>): Pick<Life, 'eras' | 'moments' | 'goals' | 'colours'> {
   const eras: Era[] = []
   for (const e of Array.isArray(saved.eras) ? saved.eras : []) {
     const start = typeof e?.start === 'string' ? fromIso(e.start) : null
@@ -109,20 +119,34 @@ function parseStory(saved: Partial<SavedLifeV3>): Pick<Life, 'eras' | 'moments' 
     if (typeof m?.id !== 'string' || !isLabel(m.label) || !date) continue
     moments.push({ id: m.id, label: m.label, category: oneOf(m.category, CATEGORIES, 'other'), date })
   }
+  const goals: Goal[] = []
+  for (const g of Array.isArray(saved.goals) ? saved.goals : []) {
+    if (typeof g?.id !== 'string' || !isLabel(g.label)) continue
+    const category = oneOf(g.category, CATEGORIES, 'other')
+    if (g.target?.kind === 'date') {
+      const date = typeof g.target.date === 'string' ? fromIso(g.target.date) : null
+      if (date) goals.push({ id: g.id, label: g.label, category, target: { kind: 'date', date } })
+    } else if (g.target?.kind === 'age' && Number.isInteger(g.target.age) && g.target.age > 0 && g.target.age <= MAX_GRID_YEARS) {
+      goals.push({ id: g.id, label: g.label, category, target: { kind: 'age', age: g.target.age } })
+    }
+  }
   const colours: Life['colours'] = {}
   for (const category of CATEGORIES) {
     const colour = saved.colours?.[category]
     if (typeof colour === 'string' && HEX.test(colour)) colours[category] = colour
   }
-  return { eras, moments, colours }
+  return { eras, moments, goals, colours }
 }
 
-function parse(raw: string | null): Life | null {
+const NEWER = Symbol('saved by a newer version')
+
+function parse(raw: string | null): Life | null | typeof NEWER {
   if (!raw) return null
   try {
     const saved = JSON.parse(raw) as SavedLifeV1 | SavedLifeV2 | SavedLifeV3
-    if (saved.version !== 1 && saved.version !== 2 && saved.version !== 3) return null
-    const story = saved.version === 3 ? parseStory(saved) : { eras: [], moments: [], colours: {} }
+    if (typeof saved.version === 'number' && saved.version > 3) return NEWER
+    if (![1, 2, 3].includes(saved.version)) return null
+    const story = saved.version === 3 ? parseStory(saved) : { eras: [], moments: [], goals: [], colours: {} }
     const birthDate = saved.profile ? fromIso(saved.profile.birthDate) : null
     if (!birthDate) return { profile: null, ...story }
     const profile = newProfile(birthDate)
@@ -140,13 +164,15 @@ function parse(raw: string | null): Life | null {
   }
 }
 
-export type LoadedLife = { life: Life; storageAvailable: boolean }
+/** `newerSave`: this browser holds data from a newer version of the page, so this one must not save over it. */
+export type LoadedLife = { life: Life; storageAvailable: boolean; newerSave?: boolean }
 
 /** Load the saved life. The first time, a birth date saved by the old site is imported and the old key removed. */
 export function loadLife(today: CalendarDate): LoadedLife {
   const storage = getStorage()
   if (!storage) return { life: emptyLife, storageAvailable: false }
   const saved = parse(storage.getItem(STORAGE_KEY))
+  if (saved === NEWER) return { life: emptyLife, storageAvailable: false, newerSave: true }
   if (saved) return { life: saved, storageAvailable: true }
   const legacy = readLegacyDob(storage, today)
   storage.removeItem(LEGACY_DOB_KEY)
@@ -160,7 +186,8 @@ export function loadLife(today: CalendarDate): LoadedLife {
 export function saveLife(life: Life): boolean {
   const storage = getStorage()
   if (!storage) return false
-  if (!life.profile && life.eras.length === 0 && life.moments.length === 0 && Object.keys(life.colours).length === 0) {
+  const empty = !life.profile && !life.eras.length && !life.moments.length && !life.goals.length
+  if (empty && Object.keys(life.colours).length === 0) {
     storage.removeItem(STORAGE_KEY)
     return true
   }
@@ -170,6 +197,10 @@ export function saveLife(life: Life): boolean {
     profile,
     eras: life.eras.map((e) => ({ ...e, start: toIso(e.start), end: e.end && toIso(e.end) })),
     moments: life.moments.map((m) => ({ ...m, date: toIso(m.date) })),
+    goals: life.goals.map((g) => ({
+      ...g,
+      target: g.target.kind === 'date' ? { kind: 'date', date: toIso(g.target.date) } : g.target,
+    })),
     colours: life.colours,
   }
   storage.setItem(STORAGE_KEY, JSON.stringify(saved))

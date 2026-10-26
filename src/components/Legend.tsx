@@ -1,10 +1,10 @@
-import { CATEGORIES, CATEGORY_NAMES, categoryColour, type Category, type Era, type Moment } from '../life/story'
+import { CATEGORIES, CATEGORY_NAMES, categoryColour, type Category, type Era, type Goal, type Moment } from '../life/story'
 
-type Props = { eras: Era[]; moments: Moment[]; colours: Partial<Record<Category, string>> }
+type Props = { eras: Era[]; moments: Moment[]; goals: Goal[]; colours: Partial<Record<Category, string>> }
 
 /** What the colours and marks on the grid mean: the categories in use, plus lived, this week and moments. */
-export function Legend({ eras, moments, colours }: Props) {
-  const used = CATEGORIES.filter((c) => eras.some((e) => e.category === c) || moments.some((m) => m.category === c))
+export function Legend({ eras, moments, goals, colours }: Props) {
+  const used = CATEGORIES.filter((c) => [...eras, ...moments, ...goals].some((entry) => entry.category === c))
   const item = 'flex items-center gap-1.5'
   const swatch = 'inline-block size-3 rounded-[2px] border'
   return (
@@ -31,6 +31,12 @@ export function Legend({ eras, moments, colours }: Props) {
         <li className={item}>
           <span aria-hidden className="inline-block size-2 rounded-full bg-paper ring-1 ring-ink" />
           Moment
+        </li>
+      )}
+      {goals.length > 0 && (
+        <li className={item}>
+          <span aria-hidden className={`${swatch} border-2 border-ink`} />
+          Goal
         </li>
       )}
       <li className={item}>

@@ -1,7 +1,7 @@
 /**
  * The person's story on the grid: eras (date ranges) and moments (single past dates), each with a category.
  */
-import { boxIndex, compareDates, type CalendarDate, type View } from './lifeMaths'
+import { birthdayIn, boxIndex, compareDates, daysBetween, type CalendarDate, type View } from './lifeMaths'
 
 export const CATEGORIES = ['home', 'work', 'education', 'relationships', 'travel', 'health', 'other'] as const
 export type Category = (typeof CATEGORIES)[number]
@@ -37,7 +37,32 @@ export type Era = { id: string; label: string; category: Category; start: Calend
 /** A single day that happened. */
 export type Moment = { id: string; label: string; category: Category; date: CalendarDate }
 
-export type BoxStory = { eras: string[]; moments: string[] }
+/** Something to aim for: by a date, or by an age (its birthday). Ticking one off turns it into a moment. */
+export type Goal = {
+  id: string
+  label: string
+  category: Category
+  target: { kind: 'date'; date: CalendarDate } | { kind: 'age'; age: number }
+}
+
+/** The day a goal is aimed at. */
+export function goalDate(birth: CalendarDate, goal: Goal): CalendarDate {
+  return goal.target.kind === 'date' ? goal.target.date : birthdayIn(birth, birth.year + goal.target.age)
+}
+
+/** Whole weeks from today until a date (0 within the coming week; negative once passed). */
+export function weeksToGo(today: CalendarDate, date: CalendarDate): number {
+  return Math.floor(daysBetween(today, date) / 7)
+}
+
+/** "1,233 weeks to go", "this week", or "date passed". */
+export function countdown(weeks: number): string {
+  if (weeks < 0) return 'date passed'
+  if (weeks === 0) return 'this week'
+  return `${weeks.toLocaleString('en-GB')} ${weeks === 1 ? 'week' : 'weeks'} to go`
+}
+
+export type BoxStory = { eras: string[]; moments: string[]; goals: string[] }
 
 /** For one view, the eras (newest start first) and moments in each box that has any. */
 export function layoutStory(
@@ -46,11 +71,12 @@ export function layoutStory(
   today: CalendarDate,
   eras: Era[],
   moments: Moment[],
+  goals: Goal[] = [],
 ): Map<number, BoxStory> {
   const boxes = new Map<number, BoxStory>()
   const at = (index: number) => {
     let box = boxes.get(index)
-    if (!box) boxes.set(index, (box = { eras: [], moments: [] }))
+    if (!box) boxes.set(index, (box = { eras: [], moments: [], goals: [] }))
     return box
   }
   const newestFirst = [...eras].sort((a, b) => compareDates(b.start, a.start))
@@ -60,6 +86,10 @@ export function layoutStory(
     const first = Math.max(0, boxIndex(view, birth, era.start))
     const last = boxIndex(view, birth, end)
     for (let index = first; index <= last; index++) at(index).eras.push(era.id)
+  }
+  for (const goal of goals) {
+    const index = boxIndex(view, birth, goalDate(birth, goal))
+    if (index >= 0) at(index).goals.push(goal.id)
   }
   for (const moment of moments) {
     const index = boxIndex(view, birth, moment.date)
