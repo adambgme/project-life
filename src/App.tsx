@@ -5,11 +5,12 @@ import { ImportDialog, type PendingImport } from './components/ImportDialog'
 import { LifeGrid } from './components/LifeGrid'
 import { ViewToggle } from './components/ViewToggle'
 import { Legend } from './components/Legend'
+import { LifeBar } from './components/LifeBar'
 import { StoryPanel, type PanelMode } from './components/StoryPanel'
 import { YourDetails } from './components/YourDetails'
 import { EXAMPLE } from './life/example'
 import { BOXES_PER_YEAR, boxIndex, calendarDateIn, type View } from './life/lifeMaths'
-import { chanceOfReaching, outlook, suggestedGridYears } from './life/mortality'
+import { chanceOfReaching, lifeProgress, outlook, suggestedGridYears } from './life/mortality'
 import { CLASSIC_GRID_YEARS, emptyLife, MIN_GRID_YEARS, newProfile } from './life/store'
 import { categoryColour, countdown, goalDate, layoutStory, weeksToGo, type Category } from './life/story'
 import { useLife } from './life/useLife'
@@ -248,6 +249,13 @@ export function App() {
             <strong className="font-semibold">{lived.toLocaleString('en-GB')}</strong> {UNIT[view]}
             <span className="text-ink-soft">, of the {total} on a {gridYears}-year grid.</span>
           </p>
+          {profile.statistics !== 'hidden' && (
+            <LifeBar
+              progress={lifeProgress(personal, birthDate, today)}
+              who={isExample ? EXAMPLE.name : 'you'}
+              source={`Based on ONS ${mortality.source.edition} life tables.`}
+            />
+          )}
           {nextGoal && (
             <p className="text-base" data-testid="next-goal">
               Next goal: <strong className="font-semibold">{nextGoal.goal.label}</strong>, {countdown(nextGoal.weeks)}.

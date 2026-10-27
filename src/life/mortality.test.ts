@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import uk from '../data/mortality/uk.json'
-import { ageAtChance, chanceOfReaching, lifeExpectancyAtBirth, outlook, suggestedGridYears } from './mortality'
+import { ageAtChance, chanceOfReaching, lifeExpectancyAtBirth, lifeProgress, outlook, suggestedGridYears } from './mortality'
 import { decodeMortality, type EncodedMortalityData } from './mortalityData'
 
 const data = decodeMortality(uk as EncodedMortalityData)
@@ -87,3 +87,26 @@ function iso(value: string) {
   const [year, month, day] = value.split('-').map(Number) as [number, number, number]
   return { year, month, day }
 }
+
+describe('lifeProgress: how much of an average lifetime is lived', () => {
+  const data = decodeMortality(uk as EncodedMortalityData)
+  const birth = { year: 1990, month: 6, day: 15 }
+  const today = { year: 2026, month: 10, day: 27 }
+  const o = outlook(data, birth, today, { sex: 'male' })
+
+  it('is the exact age as a share of the average age at death, with the years left and the year it falls in', () => {
+    const p = lifeProgress(o, birth, today)
+    const exactAge = 13_283 / 365.2425 // 15 Jun 1990 to 27 Oct 2026 is 13,283 days: 36.37 years
+    expect(p.fraction).toBeCloseTo(exactAge / o.lifeExpectancy, 6)
+    expect(p.yearsLeft).toBeCloseTo(o.lifeExpectancy - exactAge, 6)
+    // Born mid-1990: the average falls in the year 1990.45 + life expectancy reaches.
+    expect(p.expectedYear).toBe(Math.floor(1990 + 165 / 365.2425 + o.lifeExpectancy))
+  })
+
+  it('stays below 1 at any age, since the average is for people still alive', () => {
+    const old = { year: 1921, month: 1, day: 1 }
+    const p = lifeProgress(outlook(data, old, today, { sex: 'female' }), old, today)
+    expect(p.fraction).toBeLessThan(1)
+    expect(p.yearsLeft).toBeGreaterThan(0)
+  })
+})

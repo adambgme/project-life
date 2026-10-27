@@ -3,7 +3,7 @@
  * reaching any age. Pure functions over the bundled tables. It never produces a single "death date": only
  * probabilities, ranges and averages.
  */
-import { ageOn, type CalendarDate } from './lifeMaths'
+import { ageOn, daysBetween, type CalendarDate } from './lifeMaths'
 
 export type Sex = 'male' | 'female' | 'both'
 export type Variant = 'principal' | 'high' | 'low'
@@ -108,4 +108,26 @@ export function lifeExpectancyAtBirth(data: MortalityData, options: OutlookOptio
 export function suggestedGridYears(o: Outlook, min = 40, max = 120): number {
   const roundUp5 = (age: number) => Math.ceil(age / 5) * 5
   return Math.min(max, Math.max(min, roundUp5(ageAtChance(o, 0.1)), roundUp5(o.fromAge + 1)))
+}
+
+const DAYS_PER_YEAR = 365.2425
+
+export type LifeProgress = {
+  /** Exact age as a share (0–1) of the average age at death for people like you. */
+  fraction: number
+  /** Average years still ahead. */
+  yearsLeft: number
+  /** The calendar year that average falls in. */
+  expectedYear: number
+}
+
+/** How much of an average lifetime for people like you has been lived. An average for a group, never a forecast. */
+export function lifeProgress(o: Outlook, birthDate: CalendarDate, today: CalendarDate): LifeProgress {
+  const exactAge = daysBetween(birthDate, today) / DAYS_PER_YEAR
+  const startOfBirthYear = { year: birthDate.year, month: 1, day: 1 }
+  return {
+    fraction: exactAge / o.lifeExpectancy,
+    yearsLeft: o.lifeExpectancy - exactAge,
+    expectedYear: Math.floor(birthDate.year + daysBetween(startOfBirthYear, birthDate) / DAYS_PER_YEAR + o.lifeExpectancy),
+  }
 }
