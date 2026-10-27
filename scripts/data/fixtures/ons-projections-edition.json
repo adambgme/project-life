@@ -1,0 +1,13 @@
+{
+ "type": "dataset",
+ "uri": "/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/mortalityratesqxprincipalprojectionunitedkingdom/2024based",
+ "downloads": [
+  {
+   "file": "ukppp24qx.xlsx"
+  }
+ ],
+ "description": {
+  "releaseDate": "2026-05-14T23:00:00.000Z",
+  "edition": "2024-based"
+ }
+}

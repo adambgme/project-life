@@ -1,0 +1,16 @@
+{
+ "type": "dataset_landing_page",
+ "uri": "/peoplepopulationandcommunity/healthandsocialcare/healthinequalities/datasets/healthylifeexpectancybynationalareadeprivationenglandtimeseries",
+ "datasets": [
+  {
+   "uri": "/peoplepopulationandcommunity/healthandsocialcare/healthinequalities/datasets/healthylifeexpectancybynationalareadeprivationenglandtimeseries/between2013to2015and2022to2024"
+  },
+  {
+   "uri": "/peoplepopulationandcommunity/healthandsocialcare/healthinequalities/datasets/healthylifeexpectancybynationalareadeprivationenglandtimeseries/between2013to2015and2020to2022"
+  }
+ ],
+ "description": {
+  "title": "Healthy life expectancy by national area deprivation, England, time series",
+  "releaseDate": "2026-04-14T23:00:00.000Z"
+ }
+}
