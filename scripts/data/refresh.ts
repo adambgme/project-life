@@ -53,9 +53,15 @@ if (deprivation !== editions.deprivation.edition) {
 
 // UN WPP: revisions come every two years or so, named by year.
 for (let revision = editions.wpp.revision + 1; revision <= editions.wpp.revision + 3; revision++) {
-  const head = await fetch(`${WPP_CSV}/${wppFileName(revision, 'Male')}`, { method: 'HEAD', headers: HEADERS })
-  if (head.ok) {
+  // A real file starts with gzip's magic bytes; an error page served as 200 doesn't.
+  const start = await fetch(`${WPP_CSV}/${wppFileName(revision, 'Male')}`, { headers: { ...HEADERS, range: 'bytes=0-1' } })
+  // Read only the first chunk, in case the server ignores the range and sends the whole file.
+  const reader = start.ok ? start.body?.getReader() : undefined
+  const bytes = (reader && (await reader.read()).value) || new Uint8Array()
+  await reader?.cancel()
+  if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
     changes.push(`UN World Population Prospects: ${editions.wpp.revision} → ${revision}`)
+    // The UN doesn't publish a machine-readable release date: record the day it was found.
     editions.wpp = { revision, released: new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' }) }
   }
 }
@@ -65,6 +71,7 @@ const nomis = await fetch(
   'https://www.nomisweb.co.uk/api/v01/dataset/NM_161_1.data.csv?geography=2092957703&cause_of_death=0&gender=0&age=1&measure=1&measures=20100&time=latest&select=date_name',
   { headers: HEADERS },
 )
+if (!nomis.ok) throw new Error(`Nomis NM_161: HTTP ${nomis.status}`)
 const latestYear = Number(/"(\d{4})"/.exec(await nomis.text())?.[1])
 if (!latestYear) throw new Error('Nomis NM_161: no latest year')
 const causesYear = JSON.parse(readFileSync(new URL('../../src/data/causes/england-wales.json', import.meta.url), 'utf8')).year

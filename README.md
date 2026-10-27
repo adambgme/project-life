@@ -36,7 +36,10 @@ npm run data:build   # parses, checks and writes src/data/ and public/data/count
 The editions in use are recorded in `scripts/data/editions.json`. On the 1st of each month the **Refresh statistics**
 workflow (`.github/workflows/refresh-data.yml`) checks each source for a newer edition (`node scripts/data/refresh.ts`).
 If it finds one, it fetches, rebuilds and checks the data, then opens a PR summarising the changes in life expectancy.
-A source whose layout has changed fails the job, and no PR is opened. It can also be run by hand from the Actions tab.
+A source whose layout has changed fails the job, and no PR is opened. If the checks fail (a new ONS edition needs the
+model tests' published figures updating), the PR opens as a draft with the output. Opening PRs needs "Allow GitHub
+Actions to create and approve pull requests" in the repo's Actions settings; without it the job opens an issue with a
+link to the branch instead. It can also be run by hand from the Actions tab.
 
 ## Credit
 

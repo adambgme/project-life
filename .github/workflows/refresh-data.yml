@@ -11,6 +11,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
   actions: write
 
 concurrency:
@@ -42,22 +43,24 @@ jobs:
         if: steps.check.outputs.changed == 'true'
         run: npm run data:fetch && npm run data:build
 
+      # A new edition can legitimately fail the model checks (they hold the published figures of the edition in use), so
+      # a failure here still opens a PR, as a draft with the output, for someone to update those figures.
       - name: Check the rebuilt data
+        id: tests
         if: steps.check.outputs.changed == 'true'
-        run: npm run typecheck && npm run lint && npm test
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          { npm run typecheck && npm run lint && npm test; } 2>&1 | tee checks.log
 
       - name: Open a PR
         if: steps.check.outputs.changed == 'true'
         env:
           CHANGES: ${{ steps.check.outputs.changes }}
+          CHECKS: ${{ steps.tests.outcome }}
         run: |
-          branch="data/refresh-$(date -u +%Y-%m-%d)"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "$branch"
-          git add scripts/data/editions.json src/data public/data
-          git commit -m "Refresh statistics" -m "$CHANGES"
-          git push -u origin "$branch"
+          branch="data/refresh-$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}"
+          # The summary compares the rebuilt files with the data committed on gh-pages, so it's written before committing.
           {
             echo "The monthly check found newer statistics."
             echo
@@ -67,8 +70,29 @@ jobs:
             echo
             node scripts/data/summary.ts
             echo
-            echo "Built and checked by the Refresh statistics workflow (typecheck, lint, unit tests). Review the figures, then ship it."
+            if [ "$CHECKS" = success ]; then
+              echo "Built and checked by the Refresh statistics workflow (typecheck, lint, unit tests). Review the figures, then ship it."
+            else
+              echo "**The checks failed**, so this is a draft. If only the model checks against ONS's published figures failed, update them for the new edition (docs/adr/0002-life-tables.md). Last lines:"
+              echo
+              echo '```'
+              tail -40 checks.log
+              echo '```'
+            fi
           } > body.md
-          gh pr create --base gh-pages --head "$branch" --title "Refresh statistics ($(date -u '+%B %Y'))" --body-file body.md
-          # PRs opened with the workflow token don't start CI; a dispatch does, and its checks count for this commit.
-          gh workflow run ci.yml --ref "$branch"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add scripts/data/editions.json src/data public/data
+          git commit -m "Refresh statistics" -m "$CHANGES"
+          git push -u origin "$branch"
+          title="Refresh statistics ($(date -u '+%B %Y'))"
+          draft=$([ "$CHECKS" = success ] || echo --draft)
+          if gh pr create --base gh-pages --head "$branch" --title "$title" --body-file body.md $draft; then
+            # PRs opened with the workflow token don't start CI; a dispatch does, and its checks count for this commit.
+            gh workflow run ci.yml --ref "$branch"
+          else
+            # Without "Allow GitHub Actions to create and approve pull requests" in the repo settings, say so in an issue.
+            { echo "The branch \`$branch\` is ready, but this workflow isn't allowed to open pull requests. Open one from it:"; echo; echo "https://github.com/${GITHUB_REPOSITORY}/compare/gh-pages...${branch}"; echo; cat body.md; } > issue.md
+            gh issue create --title "$title" --body-file issue.md
+          fi

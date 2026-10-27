@@ -9,7 +9,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 mkdirSync(CACHE, { recursive: true })
 for (const file of allFiles()) {
   const target = new URL(file.name, CACHE)
-  if (existsSync(target)) continue
+  if (existsSync(target) && !file.fresh) continue
   for (let attempt = 1; ; attempt++) {
     const response = await fetch(file.url, { headers: { 'user-agent': 'your-life data pipeline (github.com/adambgme/project-life)' } })
     const body = new Uint8Array(await response.arrayBuffer())

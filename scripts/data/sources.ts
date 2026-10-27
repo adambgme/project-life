@@ -62,13 +62,13 @@ export const REFERENCE_FILES = [
 ]
 
 /** A file to cache: an xlsx workbook unless `kind` says otherwise. */
-export type SourceFile = { name: string; url: string; kind?: 'csv' | 'gzip' }
+export type SourceFile = { name: string; url: string; kind?: 'csv' | 'gzip'; /** Always download afresh (the source serves its latest data under the same name). */ fresh?: boolean }
 
 export function allFiles(): SourceFile[] {
   return [
     ...NATIONS.flatMap((nation) => VARIANTS.map((variant) => qxFile(nation, variant))),
     ...REFERENCE_FILES,
-    { name: CAUSES.name, url: CAUSES.url, kind: 'csv' as const },
+    { name: CAUSES.name, url: CAUSES.url, kind: 'csv' as const, fresh: true },
     ...WPP.files.map((file) => ({ ...file, kind: 'gzip' as const })),
     ...DEPRIVATION.files,
   ]
