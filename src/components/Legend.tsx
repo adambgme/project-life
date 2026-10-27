@@ -1,16 +1,23 @@
-import { CATEGORIES, CATEGORY_NAMES, categoryColour, type Category, type Era, type Goal, type Moment } from '../life/story'
+import { CATEGORIES, CATEGORY_NAMES, categoryColour, categoryPattern, type Category, type Era, type Goal, type Moment } from '../life/story'
 
-type Props = { eras: Era[]; moments: Moment[]; goals: Goal[]; colours: Partial<Record<Category, string>>; chances?: boolean }
+type Props = {
+  eras: Era[]
+  moments: Moment[]
+  goals: Goal[]
+  colours: Partial<Record<Category, string>>
+  chances?: boolean
+  patterns?: boolean
+}
 
 /** What the colours and marks on the grid mean: the categories in use, plus lived, this week and moments. */
-export function Legend({ eras, moments, goals, colours, chances }: Props) {
+export function Legend({ eras, moments, goals, colours, chances, patterns }: Props) {
   const used = CATEGORIES.filter((c) => [...eras, ...moments, ...goals].some((entry) => entry.category === c))
   const item = 'flex items-center gap-1.5'
   const swatch = 'inline-block size-3 rounded-[2px] border'
   return (
     <ul aria-label="Key" className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-soft" data-testid="legend" data-print-part>
       <li className={item}>
-        <span aria-hidden className={`${swatch} border-accent bg-accent`} />
+        <span aria-hidden className={`${swatch} border-ink bg-ink`} />
         Lived
       </li>
       <li className={item}>
@@ -22,7 +29,11 @@ export function Legend({ eras, moments, goals, colours, chances }: Props) {
           <span
             aria-hidden
             className={swatch}
-            style={{ background: categoryColour(category, colours), borderColor: categoryColour(category, colours) }}
+            style={{
+              backgroundColor: categoryColour(category, colours),
+              backgroundImage: patterns ? categoryPattern(category) : undefined,
+              borderColor: categoryColour(category, colours),
+            }}
           />
           {CATEGORY_NAMES[category]}
         </li>

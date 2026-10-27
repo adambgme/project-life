@@ -32,6 +32,24 @@ export function categoryColour(category: Category, chosen: Partial<Record<Catego
   return chosen[category] ?? `var(--color-cat-${category})`
 }
 
+/** A texture for each category (the "Patterns on eras" setting), drawn in the paper colour over an era's fill, so
+ * eras can be told apart without colour: lines at four angles, a crosshatch and rings. Other stays plain. */
+const STROKE = 'color-mix(in srgb, var(--color-paper) 75%, transparent)'
+const lines = (angle: number) => `repeating-linear-gradient(${angle}deg, ${STROKE} 0 1px, transparent 1px 4px)`
+const PATTERNS: Record<Category, string | undefined> = {
+  home: lines(45),
+  work: lines(-45),
+  education: lines(0),
+  relationships: `${lines(45)}, ${lines(-45)}`,
+  travel: lines(90),
+  health: `repeating-radial-gradient(circle, ${STROKE} 0 1px, transparent 1px 3px)`,
+  other: undefined,
+}
+
+export function categoryPattern(category: Category): string | undefined {
+  return PATTERNS[category]
+}
+
 /** A period of life. `end: null` means it's still going on (it runs to today). */
 export type Era = { id: string; label: string; category: Category; start: CalendarDate; end: CalendarDate | null }
 /** A single day that happened. */

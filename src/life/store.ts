@@ -21,6 +21,8 @@ export type Profile = {
   gridYears: number | null
   /** Just the numbers (default), shade the grid with the chance of being alive, or hide all statistics. */
   statistics: Statistics
+  /** Give each era category its own texture, so eras can be told apart without colour. */
+  patterns: boolean
 }
 
 export const STATISTICS = ['numbers', 'grid', 'hidden'] as const
@@ -41,7 +43,7 @@ export const MAX_GRID_YEARS = 120
 
 /** Details for someone who has only entered a birth date. */
 export function newProfile(birthDate: CalendarDate): Profile {
-  return { birthDate, sex: 'both', nation: 'uk', basis: 'cohort', gridYears: null, statistics: 'numbers' }
+  return { birthDate, sex: 'both', nation: 'uk', basis: 'cohort', gridYears: null, statistics: 'numbers', patterns: false }
 }
 
 type SavedLifeV1 = { version: 1; profile: { birthDate: string } | null }
@@ -51,8 +53,9 @@ type SavedProfileV2 = {
   nation: Nation
   basis: Basis
   gridYears: number | null
-  /** Added within v3; older code ignores it. */
+  /** Added within v3; older code ignores them. */
   statistics?: Statistics
+  patterns?: boolean
 }
 type SavedLifeV2 = { version: 2; profile: SavedProfileV2 | null }
 type SavedEra = { id: string; label: string; category: Category; start: string; end: string | null }
@@ -175,6 +178,7 @@ function parse(raw: string | null): Life | null | typeof NEWER {
       profile.nation = oneOf(saved.profile.nation, NATIONS, 'uk')
       profile.basis = oneOf(saved.profile.basis, ['cohort', 'period'] as const, 'cohort')
       profile.statistics = oneOf(saved.profile.statistics, STATISTICS, 'numbers')
+      profile.patterns = saved.profile.patterns === true
       const years = saved.profile.gridYears
       profile.gridYears =
         Number.isInteger(years) && years! >= MIN_GRID_YEARS && years! <= MAX_GRID_YEARS ? years : null

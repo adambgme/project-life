@@ -128,16 +128,16 @@ test('the grid can be explored with the keyboard', async ({ page }) => {
 
   const today = page.locator('[data-state="today"]')
   await today.focus()
-  await expect(today).toHaveAccessibleName('Age 36, week 20: 26 Oct 2026 to 1 Nov 2026, this week')
+  await expect(today).toHaveAccessibleName('Week 1,892 of 5,200. Age 36, week 20: 26 Oct 2026 to 1 Nov 2026, this week')
 
   await page.keyboard.press('ArrowRight')
-  await expect(page.locator(':focus')).toHaveAccessibleName('Age 36, week 21: 2 Nov 2026 to 8 Nov 2026')
+  await expect(page.locator(':focus')).toHaveAccessibleName('Week 1,893 of 5,200. Age 36, week 21: 2 Nov 2026 to 8 Nov 2026')
   await page.keyboard.press('ArrowUp')
-  await expect(page.locator(':focus')).toHaveAccessibleName('Age 35, week 21: 2 Nov 2025 to 8 Nov 2025, lived')
+  await expect(page.locator(':focus')).toHaveAccessibleName('Week 1,841 of 5,200. Age 35, week 21: 2 Nov 2025 to 8 Nov 2025, lived')
   await page.keyboard.press('Home')
-  await expect(page.locator(':focus')).toHaveAccessibleName('Age 35, week 1: 15 Jun 2025 to 21 Jun 2025, lived')
+  await expect(page.locator(':focus')).toHaveAccessibleName('Week 1,821 of 5,200. Age 35, week 1: 15 Jun 2025 to 21 Jun 2025, lived')
   await page.keyboard.press('Control+Home')
-  await expect(page.locator(':focus')).toHaveAccessibleName('Age 0, week 1: 15 Jun 1990 to 21 Jun 1990, lived')
+  await expect(page.locator(':focus')).toHaveAccessibleName('Week 1 of 5,200. Age 0, week 1: 15 Jun 1990 to 21 Jun 1990, lived')
 
   // Only one box is in the tab order.
   await expect(page.locator('[role="gridcell"][tabindex="0"]')).toHaveCount(1)
@@ -168,11 +168,11 @@ test('years, months and weeks views, each with today marked, remembered in the a
 
   await page.getByRole('radio', { name: 'Months' }).check({ force: true })
   await expect(page).toHaveURL(/\?view=months$/)
-  await expect(page.getByRole('grid')).toHaveAccessibleName('Your life in months: three years per row')
+  await expect(page.getByRole('grid')).toHaveAccessibleName('Your life in months: three years per row. 436 of 1,200 months lived.')
   await expect(page.getByTestId('summary')).toHaveText("You've lived 436 months, of the 1,200 on a 100-year grid.")
   await expect(page.locator('[data-state="lived"]')).toHaveCount(436)
   await expect(page.locator('[data-state="today"]')).toHaveAccessibleName(
-    'Age 36, month 5: 15 Oct 2026 to 14 Nov 2026, this month',
+    'Month 437 of 1,200. Age 36, month 5: 15 Oct 2026 to 14 Nov 2026, this month',
   )
 
   await page.reload()
@@ -181,7 +181,7 @@ test('years, months and weeks views, each with today marked, remembered in the a
   await page.getByRole('radio', { name: 'Years' }).check({ force: true })
   await expect(page).toHaveURL(/\?view=years$/)
   await expect(page.locator('[data-state="lived"]')).toHaveCount(36)
-  await expect(page.locator('[data-state="today"]')).toHaveAccessibleName('Age 36: 15 Jun 2026 to 14 Jun 2027, this year')
+  await expect(page.locator('[data-state="today"]')).toHaveAccessibleName('Year 37 of 100. Age 36: 15 Jun 2026 to 14 Jun 2027, this year')
 
   await page.getByRole('radio', { name: 'Weeks' }).check({ force: true })
   await expect(page).toHaveURL(/\/project-life\/$/)
