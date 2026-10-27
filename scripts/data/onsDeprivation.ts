@@ -29,7 +29,7 @@ const SEXES = { Male: 'male', Female: 'female' } as const
 
 type Table = { period: string; groups: number; value: (group: number, sex: string, band: string, column: number) => number }
 
-/** One sheet's latest period, indexed. `columns` are the headers expected after Period, group, sex and age. */
+/** One sheet's latest period, indexed. `valueHeaders` are the headers expected after Period, group, sex and age. */
 function readSheet(rows: Cell[][], valueHeaders: string[]): Table {
   const headerAt = rows.findIndex((r) => r[0] === 'Period')
   const header = rows[headerAt]

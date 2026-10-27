@@ -84,3 +84,19 @@ export function readWpp(sex: 'male' | 'female') {
 
   return { line, finish }
 }
+
+/** Fail the build on implausible tables: every year's life expectancy at birth (from the single-age rates, plus half a
+ * year) must lie between 35 and 100: wide enough for every country the UN covers this century (Hong Kong is projected past 95). */
+export function checkPlausible(country: WppCountry): void {
+  country.qx.forEach((ages, i) => {
+    let alive = 1
+    let years = 0.5
+    for (const q of ages) {
+      alive *= 1 - q
+      years += alive
+    }
+    if (years < 35 || years > 100) {
+      throw new Error(`${country.code} ${country.firstYear + i}: life expectancy at birth of ${years.toFixed(1)} is implausible`)
+    }
+  })
+}

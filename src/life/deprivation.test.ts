@@ -13,8 +13,9 @@ describe('deprivationOutlook: average age at death by how deprived an area is', 
     expect(most.ageAtDeath).toBeCloseTo(35 + most.years, 5)
     expect(least.ageAtDeath).toBeGreaterThan(most.ageAtDeath + 5)
     expect(most.healthyYears).toBeLessThan(most.years)
-    expect(most.low).toBeLessThan(most.ageAtDeath)
-    expect(most.high).toBeGreaterThan(most.ageAtDeath)
+    expect(most.range!.low).toBeLessThan(most.ageAtDeath)
+    expect(most.range!.high).toBeGreaterThan(most.ageAtDeath)
+    expect(at37.period).toBe('2022 to 2024')
   })
 
   it('uses Wales in fifths for Wales, and England for the rest of the UK', () => {
@@ -26,6 +27,8 @@ describe('deprivationOutlook: average age at death by how deprived an area is', 
   it('averages men and women for both sexes', () => {
     const fifth = (sex: 'male' | 'female' | 'both') => deprivationOutlook('england', sex, 60).groups[4]!.ageAtDeath
     expect(fifth('both')).toBeCloseTo((fifth('male') + fifth('female')) / 2, 5)
+    // Confidence intervals can't be averaged, so none is given.
+    expect(deprivationOutlook('england', 'both', 60).groups[4]!.range).toBeUndefined()
   })
 
   it('covers every age: under 1, and 90 and over', () => {

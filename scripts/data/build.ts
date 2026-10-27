@@ -8,7 +8,7 @@ import { MAX_AGE, parseQxSheet } from './onsQx.ts'
 import { parseCausesCsv } from './nomisCauses.ts'
 import { parseDeprivation } from './onsDeprivation.ts'
 import { CAUSES, DEPRIVATION, NATIONS, PROJECTIONS, VARIANTS, WPP, qxFile } from './sources.ts'
-import { WPP_MAX_AGE, readWpp, type WppCountry } from './wpp.ts'
+import { WPP_MAX_AGE, checkPlausible, readWpp, type WppCountry } from './wpp.ts'
 import { readSheetRows } from './xlsx.ts'
 
 /** Follow everyone alive today (born 1900 onwards) and anyone born before 2030 to age 100. */
@@ -74,6 +74,9 @@ for (const file of WPP.files) {
   const input = createReadStream(new URL(`../../data-cache/${file.name}`, import.meta.url)).pipe(createGunzip())
   for await (const line of createInterface({ input })) reader.line(line)
   bySex[file.sex] = reader.finish()
+  bySex[file.sex]!.forEach(checkPlausible)
+  // WPP 2024 covers 237 countries and areas; far fewer means the file or its layout changed.
+  if (bySex[file.sex]!.size < 230) throw new Error(`WPP ${file.sex}: only ${bySex[file.sex]!.size} countries`)
 }
 const countriesOut = new URL('../../public/data/countries/', import.meta.url)
 rmSync(countriesOut, { recursive: true, force: true })

@@ -1,5 +1,7 @@
 /** Save small extracts of real source sheets for the parser tests. Run after `npm run data:fetch`. */
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { createReadStream, mkdirSync, writeFileSync } from 'node:fs'
+import { createInterface } from 'node:readline'
+import { createGunzip } from 'node:zlib'
 import { readSheetRows } from './xlsx.ts'
 
 const rows = await readSheetRows(new URL('../../data-cache/ukppp24qx.xlsx', import.meta.url), 'males period qx')
@@ -15,9 +17,6 @@ console.log('saved fixture with', trimmed.length, 'rows')
 
 // UN WPP 2024 life tables: the header, a region (skipped), Japan and Hong Kong (a name with a comma), 2024–2025.
 for (const sex of ['Male', 'Female']) {
-  const { createReadStream } = await import('node:fs')
-  const { createGunzip } = await import('node:zlib')
-  const { createInterface } = await import('node:readline')
   const file = new URL(`../../data-cache/WPP2024_Life_Table_Complete_Medium_${sex}_2024-2100.csv.gz`, import.meta.url)
   const keep: string[] = []
   for await (const line of createInterface({ input: createReadStream(file).pipe(createGunzip()) })) {

@@ -6,7 +6,6 @@ import type { Nation } from './store'
  * Wales in fifths of the Welsh index. Group 1 is the most deprived. Scotland and Northern Ireland have their own
  * indices that ONS doesn't cover, so everyone outside Wales sees England's figures. */
 export const DEPRIVATION_SOURCE = data.source
-export const DEPRIVATION_PERIOD = data.england.period
 
 type Figure = { le: number; lci: number; uci: number; hle: number }
 
@@ -16,15 +15,16 @@ export type DeprivationGroup = {
   /** Further years expected from the band's first age, and of those, the years in "good" health. */
   years: number
   healthyYears: number
-  /** Average age at death, with its 95% confidence interval. */
+  /** Average age at death, with its 95% confidence interval (for one sex only: intervals can't be averaged). */
   ageAtDeath: number
-  low: number
-  high: number
+  range?: { low: number; high: number }
 }
 
 export type DeprivationOutlook = {
   area: 'England' | 'Wales'
   unit: 'tenth' | 'fifth'
+  /** The three years the figures come from, e.g. "2022 to 2024". */
+  period: string
   /** The first age of the age band the figures are for (0, 1, 5, 10 … 90). */
   fromAge: number
   groups: DeprivationGroup[]
@@ -40,14 +40,14 @@ export function deprivationOutlook(nation: Nation, sex: Sex, age: number): Depri
   return {
     area: nation === 'wales' ? 'Wales' : 'England',
     unit: table.groups === 10 ? 'tenth' : 'fifth',
+    period: table.period,
     fromAge,
     groups: Array.from({ length: table.groups }, (_, i) => ({
       group: i + 1,
       years: mean(i, 'le'),
       healthyYears: mean(i, 'hle'),
       ageAtDeath: fromAge + mean(i, 'le'),
-      low: fromAge + mean(i, 'lci'),
-      high: fromAge + mean(i, 'uci'),
+      range: sex === 'both' ? undefined : { low: fromAge + mean(i, 'lci'), high: fromAge + mean(i, 'uci') },
     })),
   }
 }

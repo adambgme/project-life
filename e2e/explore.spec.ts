@@ -156,6 +156,13 @@ test('if you lived in another country: the UK and the chosen country side by sid
   const ages = (await table.getByRole('row', { name: /Average age at death/ }).getByRole('cell').allTextContents()).map(Number)
   expect(ages[1]!).toBeGreaterThan(ages[0]!)
   await expect(table.getByRole('row', { name: /Chance of reaching 90/ })).toBeVisible()
+  // The two survival curves, told apart by a legend and by line style, with both in the readout.
+  await expect(page.getByTestId('chart-legend').locator('li')).toHaveText(['Living in United Kingdom', 'Living in Japan'])
+  const curves = page.getByRole('img', { name: /Survival curves for people like you: living in United Kingdom, \d+% reach 80; living in Japan/ })
+  await curves.focus()
+  const readout = page.getByTestId('chart-readout').last()
+  await expect(readout).toContainText('Living in United Kingdom: 100% alive at 36')
+  await expect(readout).toContainText('Living in Japan: 100% alive at 36')
   await expect(page.getByText('about where people live, not their nationality')).toBeVisible()
   await expect(page.getByRole('link', { name: 'CC BY 3.0 IGO' })).toBeVisible()
 
@@ -188,13 +195,17 @@ test('in Wales, neighbourhoods are in fifths; in Scotland, England is used and s
 
 test.describe('a country that cannot be loaded', () => {
   test.use({ serviceWorkers: 'block' })
-  test('says so instead of showing anything', async ({ page, pageErrors }) => {
+  test('says so instead of showing anything, and can try again', async ({ page, pageErrors }) => {
     await page.route(/\/data\/countries\/fra\.json$/, (route) => route.abort())
     await seed(page, { ...PROFILE, nation: 'england' })
     await page.goto('./?page=explore')
     await page.getByLabel('Country of residence').selectOption({ label: 'France' })
-    await expect(page.getByRole('status').filter({ hasText: 'France' })).toHaveText("The figures for France couldn't be loaded. Try again when you're online.")
+    const status = page.getByRole('status').filter({ hasText: 'France' })
+    await expect(status).toHaveText("The figures for France couldn't be loaded. Try again")
     await expect(page.getByTestId('country-compare')).toHaveCount(0)
+    await page.unroute(/\/data\/countries\/fra\.json$/)
+    await status.getByRole('button', { name: 'Try again' }).click()
+    await expect(page.getByTestId('country-compare').getByRole('columnheader')).toHaveText(['Measure', 'Living in United Kingdom', 'Living in France'])
     pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !e.includes('Failed to load resource')))
   })
 })

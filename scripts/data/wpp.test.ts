@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { readWpp } from './wpp'
+import { checkPlausible, readWpp } from './wpp'
 
 // Real rows from UN WPP 2024 (medium variant, single ages): Japan, Hong Kong (a name with a comma) and the Eastern Asia
 // region, 2024–2025.
@@ -46,5 +46,12 @@ describe('readWpp: UN life tables, one country at a time', () => {
     ['a missing year', (l: string[]) => l.filter((row) => !(row.includes(',Japan,') && row.includes(',2025,'))), /JPN: years/],
   ])('fails loudly on %s', (_name, edit, message) => {
     expect(() => read('male', edit)).toThrow(message)
+  })
+
+  it('accepts real tables and rejects implausible ones', () => {
+    const japan = read('male').get('JPN')!
+    expect(() => checkPlausible(japan)).not.toThrow()
+    const inflated = { ...japan, qx: japan.qx.map((ages) => ages.map((q) => Math.min(1, q * 100))) }
+    expect(() => checkPlausible(inflated)).toThrow(/JPN 2024: life expectancy at birth of [\d.]+ is implausible/)
   })
 })

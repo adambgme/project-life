@@ -8,6 +8,7 @@ import { CausesSection } from './CausesSection'
 import { CountrySection } from './CountrySection'
 import { DeprivationSection } from './DeprivationSection'
 import { DotRows } from './DotRows'
+import { longDate } from './format'
 import { LineChart, type Point } from './LineChart'
 
 const NATION_NAMES: Record<Nation, string> = {
@@ -78,7 +79,7 @@ export function ExplorePage({ profile, today, isExample, onProfile }: Props) {
   const sexWords = profile.sex === 'both' ? 'both sexes averaged' : `${profile.sex}s`
   const section = 'flex flex-col gap-3 border-t border-rule pt-5'
   const h2 = 'font-display text-2xl'
-  const source = `${data.source.attribution}. ${data.source.edition} life tables, released ${new Date(data.source.released).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`
+  const source = `${data.source.attribution}. ${data.source.edition} life tables, released ${longDate(data.source.released)}.`
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-8 px-4 py-8 sm:px-8 sm:py-12">

@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { DEPRIVATION_PERIOD, DEPRIVATION_SOURCE, deprivationOutlook } from '../life/deprivation'
+import { DEPRIVATION_SOURCE, deprivationOutlook } from '../life/deprivation'
 import type { Sex } from '../life/mortality'
 import type { Nation } from '../life/store'
 import { DotRows } from './DotRows'
+import { longDate } from './format'
 
 const ORDINAL = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th']
 
@@ -13,20 +14,25 @@ export function DeprivationSection({ nation, sex, age, who }: { nation: Nation; 
   const [mine, setMine] = useState<number | null>(null)
   const chosen = mine !== null && mine <= outlook.groups.length ? mine : null
   const [most, least] = [outlook.groups[0]!, outlook.groups.at(-1)!]
-  const name = (group: number) =>
-    `${ORDINAL[group - 1]} ${outlook.unit}${group === 1 ? ' (most deprived)' : group === outlook.groups.length ? ' (least deprived)' : ''}`
-  const sexWords = sex === 'both' ? 'men and women averaged' : sex === 'male' ? 'men' : 'women'
+  /** "1st tenth (most deprived)"; `short` drops the brackets for the narrow dot-plot labels. */
+  const name = (group: number, short = false) => {
+    const end = group === 1 ? 'most deprived' : group === outlook.groups.length ? 'least deprived' : ''
+    const base = `${ORDINAL[group - 1]} ${outlook.unit}`
+    return !end ? base : short ? `${base}, ${end}` : `${base} (${end})`
+  }
+  const people = sex === 'both' ? 'people' : sex === 'male' ? 'men' : 'women'
+  const ranged = outlook.groups.every((g) => g.range)
 
   return (
     <div className="flex flex-col gap-4">
       <p>
         ONS splits {outlook.area}'s neighbourhoods into {outlook.unit}s, from the most to the least deprived (by income, jobs,
-        health, education, housing, crime and surroundings). For {sexWords} aged {outlook.fromAge}
+        health, education, housing, crime and surroundings). For {people} aged {outlook.fromAge}
         {outlook.fromAge >= 90 ? ' and over' : outlook.fromAge < age ? ' (the start of your age band)' : ''}, the average age at death runs from{' '}
         <strong className="font-semibold">{most.ageAtDeath.toFixed(1)}</strong> in the most deprived {outlook.unit} to{' '}
         <strong className="font-semibold">{least.ageAtDeath.toFixed(1)}</strong> in the least deprived. Of the years ahead, about{' '}
         {most.healthyYears.toFixed(0)} are expected in good health in the most deprived {outlook.unit}, and{' '}
-        {least.healthyYears.toFixed(0)} in the least.
+        {least.healthyYears.toFixed(0)} in the least.{sex === 'both' ? ' (Men and women averaged.)' : ''}
       </p>
       {nation !== 'england' && nation !== 'wales' && (
         <p className="text-sm text-ink-soft">
@@ -53,7 +59,7 @@ export function DeprivationSection({ nation, sex, age, who }: { nation: Nation; 
         testId="deprivation"
         rows={outlook.groups.map((g) => ({
           key: String(g.group),
-          label: name(g.group).replace(' (most deprived)', ', most deprived').replace(' (least deprived)', ', least deprived'),
+          label: name(g.group, true),
           value: g.ageAtDeath,
           chosen: g.group === chosen,
           chosenWords: 'your area',
@@ -66,7 +72,7 @@ export function DeprivationSection({ nation, sex, age, who }: { nation: Nation; 
             <tr className="border-b border-rule text-ink-soft">
               <th className="py-1 font-normal">Area</th>
               <th className="py-1 text-right font-normal">Average age at death</th>
-              <th className="py-1 text-right font-normal">95% range</th>
+              {ranged && <th className="py-1 text-right font-normal">95% range</th>}
               <th className="py-1 text-right font-normal">Years ahead in good health</th>
             </tr>
           </thead>
@@ -75,9 +81,11 @@ export function DeprivationSection({ nation, sex, age, who }: { nation: Nation; 
               <tr key={g.group} className="border-b border-rule/60">
                 <td className="py-0.5">{name(g.group)}</td>
                 <td className="py-0.5 text-right tabular-nums">{g.ageAtDeath.toFixed(1)}</td>
-                <td className="py-0.5 text-right tabular-nums">
-                  {g.low.toFixed(1)}–{g.high.toFixed(1)}
-                </td>
+                {g.range && (
+                  <td className="py-0.5 text-right tabular-nums">
+                    {g.range.low.toFixed(1)}–{g.range.high.toFixed(1)}
+                  </td>
+                )}
                 <td className="py-0.5 text-right tabular-nums">{g.healthyYears.toFixed(1)}</td>
               </tr>
             ))}
@@ -85,12 +93,12 @@ export function DeprivationSection({ nation, sex, age, who }: { nation: Nation; 
         </table>
       </details>
       <p className="text-xs text-ink-soft">
-        These are period figures for {DEPRIVATION_PERIOD}: they assume death rates stay as they were then. A neighbourhood's
+        These are period figures for {outlook.period}: they assume death rates stay as they were then. A neighbourhood's
         {' '}{outlook.unit} describes the area, not the people in it. {DEPRIVATION_SOURCE.attribution}.{' '}
         <a className="underline" href={DEPRIVATION_SOURCE.url}>
           Healthy life expectancy by national area deprivation
         </a>
-        , released {new Date(DEPRIVATION_SOURCE.released).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.
+        , released {longDate(DEPRIVATION_SOURCE.released)}.
       </p>
     </div>
   )

@@ -4,8 +4,10 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const base = '/project-life/'
+
 export default defineConfig({
-  base: '/project-life/',
+  base,
   plugins: [
     react(),
     tailwindcss(),
@@ -19,8 +21,8 @@ export default defineConfig({
         name: 'Your Life',
         short_name: 'Your Life',
         description: 'Your life in weeks: a private life calendar. Nothing you enter leaves your device.',
-        start_url: '/project-life/',
-        scope: '/project-life/',
+        start_url: base,
+        scope: base,
         display: 'standalone',
         background_color: '#f5efe3',
         theme_color: '#f5efe3',
@@ -45,7 +47,7 @@ export default defineConfig({
         // for offline use, refreshed in the background when online.
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.startsWith('/project-life/data/countries/'),
+            urlPattern: ({ url }) => url.pathname.startsWith(`${base}data/countries/`),
             handler: 'StaleWhileRevalidate',
             options: { cacheName: 'countries', expiration: { maxEntries: 30 } },
           },
