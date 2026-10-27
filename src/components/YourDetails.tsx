@@ -32,7 +32,10 @@ type Props = {
 const field = 'rounded-sm border border-rule bg-paper px-2 py-1.5 text-base text-ink focus:border-ink'
 const label = 'text-sm text-ink-soft'
 
-/** The details that size the grid from ONS life tables, and the person's own override. */
+const STATISTICS_NAMES: Record<Statistics, string> = { numbers: 'just the numbers', grid: 'chances on the grid', hidden: 'statistics hidden' }
+
+/** Settings, folded away until wanted: the details that size the grid and the figures from ONS life tables, the
+ * person's own grid length, and how much statistics to show. The closed summary says what's chosen. */
 export function YourDetails(props: Props) {
   const { profile, suggestedYears, gridYears, minYears, tablesStatus, lifeExpectancy, chanceAtEnd, source, onChange } =
     props
@@ -50,10 +53,36 @@ export function YourDetails(props: Props) {
     else setDraft(String(gridYears))
   }
 
+  const chosen = [
+    ...(hidden ? [] : [SEX_NAMES[profile.sex].replace(', averaged', ' sexes'), NATION_NAMES[profile.nation], profile.basis === 'cohort' ? 'projected rates' : "this year's rates"]),
+    `${gridYears}-year grid`,
+    STATISTICS_NAMES[profile.statistics],
+  ]
+
   return (
-    <section aria-labelledby={`${id}-title`} className="flex flex-col gap-4 border-t border-rule pt-4">
-      <h2 id={`${id}-title`} className="font-display text-sm tracking-[0.12em] text-ink-soft uppercase">
-        How long is the grid?
+    <div className="flex flex-col gap-3">
+    {tablesStatus !== 'ready' && (
+      <p role="status" className="border-l-2 border-today bg-paper-deep px-3 py-2 text-sm">
+        {tablesStatus === 'loading'
+          ? `Loading the figures for ${NATION_NAMES[profile.nation]}; showing the UK's meanwhile.`
+          : `The figures for ${NATION_NAMES[profile.nation]} couldn't be loaded, so these are the UK's. Try reloading the page.`}
+      </p>
+    )}
+    <details className="group border-y border-rule" data-testid="settings">
+      <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 py-3 [&::-webkit-details-marker]:hidden">
+        <span className="font-display text-sm tracking-[0.12em] text-ink uppercase">
+          <span aria-hidden className="mr-1.5 inline-block transition-transform group-open:rotate-90 motion-reduce:transition-none">
+            ›
+          </span>
+          Settings
+        </span>
+        <span className="text-sm text-ink-soft" data-testid="settings-summary">
+          {chosen.join(' · ')}
+        </span>
+      </summary>
+    <section aria-labelledby={`${id}-title`} className="flex flex-col gap-4 pb-4">
+      <h2 id={`${id}-title`} className="sr-only">
+        Settings
       </h2>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -131,14 +160,6 @@ export function YourDetails(props: Props) {
         The grid can run from {minYears} to {MAX_GRID_YEARS} years.
       </p>
 
-      {tablesStatus !== 'ready' && (
-        <p role="status" className="border-l-2 border-today bg-paper-deep px-3 py-2 text-sm">
-          {tablesStatus === 'loading'
-            ? `Loading the figures for ${NATION_NAMES[profile.nation]}; showing the UK's meanwhile.`
-            : `The figures for ${NATION_NAMES[profile.nation]} couldn't be loaded, so these are the UK's. Try reloading the page.`}
-        </p>
-      )}
-
       <p id={`${id}-sex-note`} className={`text-xs text-ink-soft ${hidden ? 'hidden' : ''}`}>
         ONS life tables record only two sexes. "Both, averaged" uses the average of the two.
       </p>
@@ -215,17 +236,13 @@ export function YourDetails(props: Props) {
         </p>
       )}
 
-      {!hidden && (
-        <a href="?page=explore" className="self-start font-display text-base underline decoration-rule underline-offset-4 hover:decoration-ink">
-          Explore your figures in depth →
-        </a>
-      )}
-
       <p className={`text-xs text-ink-soft ${hidden ? 'hidden' : ''}`}>
         {source.attribution}. <a className="underline" href={source.url}>ONS {source.edition} life tables</a>.
         Averages describe groups of people, not any one person.
       </p>
     </section>
+    </details>
+    </div>
   )
 }
 

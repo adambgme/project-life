@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test } from './fixtures'
+import { expect, openSettings, test } from './fixtures'
 
 const NOW = new Date('2026-10-26T12:00:00Z')
 const PROFILE = { birthDate: '1990-06-15', sex: 'male', nation: 'scotland', basis: 'cohort', gridYears: null, statistics: 'numbers' }
@@ -14,11 +14,11 @@ async function seed(page: import('@playwright/test').Page, profile: object) {
   await page.reload()
 }
 
-test('the Explore page opens from the grid and shows the whole picture', async ({ page }) => {
+test('the figures sit below the grid and show the whole picture', async ({ page }) => {
   await seed(page, PROFILE)
-  await page.getByRole('link', { name: 'Explore your figures in depth' }).click()
-  await expect(page).toHaveURL(/\?page=explore$/)
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('How long people live')
+  await page.getByRole('link', { name: 'See your figures below ↓' }).click()
+  await expect(page).toHaveURL(/#figures$/)
+  await expect(page.getByRole('heading', { level: 2, name: 'Your figures' })).toBeInViewport()
   await expect(page.getByTestId('wellbeing')).toContainText('averages for large groups of people')
   await expect(page.getByText('born 1990, males, living in Scotland, aged 36 today')).toBeVisible()
 
@@ -48,34 +48,37 @@ test('the Explore page opens from the grid and shows the whole picture', async (
 
 test('switching cohort and period changes the figures and is remembered', async ({ page }) => {
   await seed(page, PROFILE)
-  await page.goto('./?page=explore')
   const summary = page.getByText(/On average they live to about/)
   const cohort = await summary.textContent()
+  await openSettings(page)
   await page.getByRole('radio', { name: "This year's (period)" }).check()
   await expect(summary).not.toHaveText(cohort!)
-  await page.goto('./')
+  await expect(page.getByTestId('settings-summary')).toContainText("this year's rates")
+  await page.reload()
+  await openSettings(page)
   await expect(page.getByRole('radio', { name: "This year's (period)" })).toBeChecked()
 })
 
-test('with statistics hidden, the Explore page stays hidden', async ({ page }) => {
+test('with statistics hidden, the figures are hidden too', async ({ page }) => {
   await seed(page, { ...PROFILE, statistics: 'hidden' })
-  await expect(page.getByRole('link', { name: 'Explore your figures in depth' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: /figures below/ })).toHaveCount(0)
   await page.goto('./?page=explore')
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Statistics are hidden')
-  await expect(page.getByRole('img')).toHaveCount(0)
+  await expect(page.locator('#figures')).toHaveCount(0)
+  await expect(page.getByTestId('life-bar')).toHaveCount(0)
 })
 
 test('without a date of birth it shows the example, clearly labelled', async ({ page }) => {
   await page.goto('./?page=explore')
-  await expect(page.getByTestId('example')).toContainText('Sam, the made-up example')
-  await expect(page.getByRole('radio')).toHaveCount(0)
+  await expect(page.getByRole('heading', { level: 2, name: "Sam's figures" })).toBeInViewport()
+  await expect(page.getByTestId('example-figures')).toContainText('Sam, the made-up example')
+  await expect(page.locator('#figures').getByRole('radio')).toHaveCount(0)
 })
 
-test('the Explore page passes an accessibility scan', async ({ page }) => {
+test('the figures pass an accessibility scan', async ({ page }) => {
   await seed(page, PROFILE)
   await page.goto('./?page=explore')
   await expect(page.getByTestId('nations')).toBeVisible()
-  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze()
+  const results = await new AxeBuilder({ page }).include('#figures').withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze()
   expect(results.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([])
 })
 
@@ -107,7 +110,7 @@ test('while a nation is loading or fails, Explore says the figures are the UK\'s
 test('causes of death: the commonest at your age, and at any age ahead', async ({ page }) => {
   await seed(page, { ...PROFILE, nation: 'england' })
   await page.goto('./?page=explore')
-  const ages = page.getByLabel('Ages')
+  const ages = page.getByRole('combobox', { name: /^Ages/ })
   await expect(ages.locator('option:checked')).toHaveText('35 to 39 (your age now)')
   // Bands before your age aren't offered.
   await expect(ages.locator('option').first()).toHaveText('35 to 39 (your age now)')
@@ -136,10 +139,10 @@ test('after a birthday into a new band, the causes follow your new age', async (
   // 39 on 26 Oct 2026, 40 from 28 Oct.
   await seed(page, { ...PROFILE, nation: 'england', birthDate: '1986-10-28' })
   await page.goto('./?page=explore')
-  await expect(page.getByLabel('Ages').locator('option:checked')).toHaveText('35 to 39 (your age now)')
+  await expect(page.getByRole('combobox', { name: /^Ages/ }).locator('option:checked')).toHaveText('35 to 39 (your age now)')
   await page.evaluate((p) => localStorage.setItem('your-life', JSON.stringify({ version: 3, profile: p, eras: [], moments: [], goals: [], colours: {} })), { ...PROFILE, nation: 'england', birthDate: '1986-10-20' })
   await page.reload()
-  await expect(page.getByLabel('Ages').locator('option:checked')).toHaveText('40 to 44 (your age now)')
+  await expect(page.getByRole('combobox', { name: /^Ages/ }).locator('option:checked')).toHaveText('40 to 44 (your age now)')
   await expect(page.getByText(/deaths of men aged 40 to 44/)).toBeVisible()
 })
 

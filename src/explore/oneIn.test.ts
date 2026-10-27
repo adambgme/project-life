@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { oneIn } from './ExplorePage'
+import { oneIn } from './Figures'
 
 it.each([
   [0.001095, '1 in 910'],

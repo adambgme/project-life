@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures'
+import { expect, openSettings, test } from './fixtures'
 
 const NOW = new Date('2026-10-26T12:00:00Z')
 
@@ -8,6 +8,7 @@ test.beforeEach(async ({ page }) => {
   await page.getByLabel('Day', { exact: true }).fill('15')
   await page.getByLabel('Month', { exact: true }).selectOption({ label: 'June' })
   await page.getByLabel('Year', { exact: true }).fill('1990')
+  await openSettings(page)
 })
 
 test('the chances overlay is off by default, and one choice turns it on and off', async ({ page }) => {
@@ -26,6 +27,7 @@ test('the chances overlay is off by default, and one choice turns it on and off'
   await expect(page.getByTestId('legend')).toContainText('Fades with the chance of being alive')
 
   await page.reload()
+  await openSettings(page)
   await expect(page.locator('[data-chance]')).toHaveCount(5200 - 1892)
   await page.getByRole('radio', { name: 'Just the numbers' }).check()
   await expect(page.locator('[data-chance]')).toHaveCount(0)
@@ -60,6 +62,7 @@ test('hiding statistics removes every figure and stays hidden', async ({ page })
   await expect(page.getByText('Office for National Statistics')).toBeHidden()
 
   await page.reload()
+  await openSettings(page)
   await expect(text).not.toContainText('live to about')
   await expect(page.locator('[data-chance]')).toHaveCount(0)
 })

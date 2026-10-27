@@ -18,7 +18,7 @@ import { useMortality } from './life/useMortality'
 import { boxChances } from './life/gridChances'
 import { exportFile, readLinkFragment } from './life/transfer'
 import { readPage, readView, writeView } from './life/viewParam'
-import { ExplorePage } from './explore/ExplorePage'
+import { Figures } from './explore/Figures'
 import { PrintShareDialog } from './share/PrintShareDialog'
 import { resolveColour, type DrawInput } from './share/drawLife'
 
@@ -30,7 +30,11 @@ export function App() {
   const today = useMemo(() => calendarDateIn(new Date(), viewerTimeZone), [])
   const { life, setLife, storageAvailable, newerSave } = useLife(today)
   const [view, setView] = useState(() => readView(window.location.search))
+  // Old links to the Explore page (`?page=explore`) land on the figures, now below the grid.
   const [page] = useState(() => readPage(window.location.search))
+  useEffect(() => {
+    if (page === 'explore') document.getElementById('figures')?.scrollIntoView()
+  }, [page])
   const storyCount = life.eras.length + life.moments.length + life.goals.length
   // A saved story with no (valid) birth date yet, e.g. while the date is being retyped: say it's kept, not Sam's life.
   const waitingForDate = !life.profile && (storyCount > 0 || Object.keys(life.colours).length > 0)
@@ -151,31 +155,6 @@ export function App() {
     }
   }
 
-  if (page === 'explore') {
-    if (life.profile?.statistics === 'hidden') {
-      return (
-        <main className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-12 sm:px-8">
-          <h1 className="font-display text-4xl">Statistics are hidden</h1>
-          <p>
-            You've chosen to hide statistics. You can turn them back on under "How long is the grid?" on the{' '}
-            <a className="underline" href="./">
-              grid page
-            </a>
-            .
-          </p>
-        </main>
-      )
-    }
-    return (
-      <ExplorePage
-        profile={profile}
-        today={today}
-        isExample={!life.profile}
-        onProfile={(next) => setLife({ ...life, profile: next })}
-      />
-    )
-  }
-
   return (
     <div className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-8 px-4 py-8 sm:px-8 sm:py-12 print:min-h-0 print:max-w-none print:gap-3 print:p-0">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-4" data-print-part>
@@ -265,6 +244,11 @@ export function App() {
             <p className="text-sm text-ink-soft">Enter your date of birth above to see your own. Nothing is saved until you do.</p>
           )}
         </div>
+        {profile.statistics !== 'hidden' && (
+          <a href="#figures" className="-mt-3 self-start text-sm text-ink-soft underline decoration-rule underline-offset-4 hover:text-ink print:hidden">
+            See {isExample ? `${EXAMPLE.name}'s` : 'your'} figures below ↓
+          </a>
+        )}
         {!isExample && (
           <div className="flex flex-wrap items-center gap-3 print:hidden">
             <button
@@ -306,6 +290,7 @@ export function App() {
           />
         </div>
         <Legend eras={shown.eras} moments={shown.moments} goals={shown.goals} colours={colours} chances={!!chances} />
+        {profile.statistics !== 'hidden' && <Figures profile={profile} today={today} isExample={isExample} />}
         </>
         )}
         {life.profile && (

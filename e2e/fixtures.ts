@@ -14,4 +14,10 @@ export const test = base.extend<{ pageErrors: string[] }>({
   ],
 })
 
+/** Open the folded Settings panel (sex, nation, grid length, death rates, statistics). */
+export async function openSettings(page: import('@playwright/test').Page) {
+  const settings = page.getByTestId('settings')
+  if (!(await settings.evaluate((el) => (el as HTMLDetailsElement).open))) await settings.locator('summary').click()
+}
+
 export { expect }
