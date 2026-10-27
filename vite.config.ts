@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    // Installable and offline: everything the app needs, every nation's tables included, is precached from this
+    // Installable and offline: everything the app needs, every UK nation's tables included, is precached from this
     // site. New versions wait for the person to choose to reload (registerType: 'prompt').
     VitePWA({
       registerType: 'prompt',
@@ -41,6 +41,15 @@ export default defineConfig({
         // The first visit is offline-ready without a reload. Updates still wait (no skipWaiting): the new worker
         // only takes over when the person chooses Reload.
         clientsClaim: true,
+        // Other countries' tables (237 files) aren't precached: each is fetched from this site when picked, then kept
+        // for offline use, refreshed in the background when online.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/project-life/data/countries/'),
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'countries', expiration: { maxEntries: 30 } },
+          },
+        ],
       },
     }),
   ],

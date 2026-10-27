@@ -49,11 +49,16 @@ export const REFERENCE_FILES = [
   { name: 'ukppp24lx.xlsx', url: `${ONS}/numberssurvivingatexactagelxprincipalprojectionunitedkingdom/2024based/ukppp24lx.xlsx` },
 ]
 
-export function allFiles() {
+/** A file to cache: an xlsx workbook unless `kind` says otherwise. */
+export type SourceFile = { name: string; url: string; kind?: 'csv' | 'gzip' }
+
+export function allFiles(): SourceFile[] {
   return [
     ...NATIONS.flatMap((nation) => VARIANTS.map((variant) => qxFile(nation, variant))),
     ...REFERENCE_FILES,
     { name: CAUSES.name, url: CAUSES.url, kind: 'csv' as const },
+    ...WPP.files.map((file) => ({ ...file, kind: 'gzip' as const })),
+    ...DEPRIVATION.files,
   ]
 }
 
@@ -71,4 +76,34 @@ export const CAUSES = {
   page: (year: number) =>
     `https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/bulletins/deathsregistrationsummarytables/${year}`,
   attribution: 'Source: Office for National Statistics licensed under the Open Government Licence v3.0',
+}
+
+/** UN World Population Prospects 2024: complete (single-age) life tables, medium variant, for 237 countries and areas,
+ * projected 2024–2100. Over 200 MB each, so fetched once; the build splits them into one small file per country. */
+const WPP_CSV = 'https://population.un.org/wpp/assets/Excel%20Files/1_Indicator%20(Standard)/CSV_FILES'
+export const WPP = {
+  edition: '2024',
+  released: '2024-07-11',
+  title: 'World Population Prospects 2024, Online Edition',
+  url: 'https://population.un.org/wpp/',
+  attribution: 'Source: United Nations, Department of Economic and Social Affairs, Population Division (2024). World Population Prospects 2024',
+  licence: 'https://creativecommons.org/licenses/by/3.0/igo/',
+  files: (['Male', 'Female'] as const).map((sex) => {
+    const name = `WPP2024_Life_Table_Complete_Medium_${sex}_2024-2100.csv.gz`
+    return { sex: sex === 'Male' ? ('male' as const) : ('female' as const), name, url: `${WPP_CSV}/${name}` }
+  }),
+}
+
+/** ONS life expectancy and healthy life expectancy by national area deprivation (England: tenths of the IMD; Wales:
+ * fifths of the WIMD), latest three-year period. */
+const HLE = 'https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/healthandsocialcare/healthinequalities/datasets'
+export const DEPRIVATION = {
+  released: '2026-04-15',
+  title: 'Healthy life expectancy by national area deprivation, England and Wales: between 2013 to 2015 and 2022 to 2024',
+  url: 'https://www.ons.gov.uk/peoplepopulationandcommunity/healthandsocialcare/healthinequalities/bulletins/healthylifeexpectancybynationalareadeprivationenglandandwales/between2013to2015and2022to2024',
+  attribution: 'Source: Office for National Statistics licensed under the Open Government Licence v3.0',
+  files: [
+    { nation: 'england' as const, name: 'hleimd2224eng.xlsx', url: `${HLE}/healthylifeexpectancybynationalareadeprivationenglandtimeseries/between2013to2015and2022to2024/hleimd2224eng.xlsx` },
+    { nation: 'wales' as const, name: 'hleimd2224wal.xlsx', url: `${HLE}/healthylifeexpectancybynationalareadeprivationwalestimeseries/between2013to2015and2022to2024/hleimd2224wal.xlsx` },
+  ],
 }

@@ -5,6 +5,9 @@ import { ageAtChance, chanceOfReaching, deathRate, outlook, type Basis, type Mor
 import { NATIONS, type Nation, type Profile } from '../life/store'
 import { loadNation, useMortality } from '../life/useMortality'
 import { CausesSection } from './CausesSection'
+import { CountrySection } from './CountrySection'
+import { DeprivationSection } from './DeprivationSection'
+import { DotRows } from './DotRows'
 import { LineChart, type Point } from './LineChart'
 
 const NATION_NAMES: Record<Nation, string> = {
@@ -244,47 +247,38 @@ export function ExplorePage({ profile, today, isExample, onProfile }: Props) {
           ) : nations.length === 0 ? (
             <p role="status" className="text-sm">The nations' figures couldn't be loaded. Try reloading the page.</p>
           ) : (
-            <NationDots rows={nations} chosen={profile.nation} />
+            <DotRows
+              label="Average age at death by nation"
+              testId="nations"
+              rows={[...nations]
+                .sort((a, b) => b.expectancy - a.expectancy)
+                .map(({ nation, expectancy }) => ({
+                  key: nation,
+                  label: NATION_NAMES[nation],
+                  value: expectancy,
+                  chosen: nation === profile.nation,
+                  chosenWords: 'where you live',
+                }))}
+            />
           )}
           <p className="text-xs text-ink-soft">{source}</p>
         </section>
+
+        <section className={section} aria-labelledby="deprivation-title">
+          <h2 id="deprivation-title" className={h2}>
+            Rich and poor neighbourhoods
+          </h2>
+          <DeprivationSection nation={profile.nation} sex={profile.sex} age={from} who={who} />
+        </section>
+
+        <section className={section} aria-labelledby="country-title">
+          <h2 id="country-title" className={h2}>
+            If you lived in another country
+          </h2>
+          <p>How the outlook for {who} would compare if they lived somewhere else.</p>
+          <CountrySection birthDate={profile.birthDate} today={today} options={options} who={who} />
+        </section>
       </main>
     </div>
-  )
-}
-
-/** A dot plot on a shared scale. The chosen nation is a filled, larger dot with a bold label; colour isn't needed to
- * tell it apart. Every dot is labelled with its value. */
-function NationDots({ rows, chosen }: { rows: { nation: Nation; expectancy: number }[]; chosen: Nation }) {
-  const values = rows.map((r) => r.expectancy)
-  const min = Math.floor(Math.min(...values) - 1)
-  const max = Math.ceil(Math.max(...values) + 1)
-  const at = (v: number) => `${((v - min) / (max - min)) * 100}%`
-  return (
-    <ul className="flex flex-col gap-3" aria-label="Average age at death by nation" data-testid="nations">
-      {[...rows]
-        .sort((a, b) => b.expectancy - a.expectancy)
-        .map(({ nation, expectancy }) => {
-          const mine = nation === chosen
-          return (
-            <li key={nation} className="grid grid-cols-[9rem_1fr] items-center gap-3 text-sm">
-              <span className={mine ? 'font-semibold' : 'text-ink-soft'}>
-                {NATION_NAMES[nation]}
-                {mine && <span className="sr-only"> (where you live)</span>}
-              </span>
-              <span className="relative h-6 border-b border-rule">
-                <span
-                  aria-hidden
-                  className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ${mine ? 'size-3.5 bg-accent ring-2 ring-paper' : 'size-2.5 border-2 border-ink-soft bg-paper'}`}
-                  style={{ left: at(expectancy) }}
-                />
-                <span className={`absolute -top-1 translate-x-2 tabular-nums ${mine ? 'font-semibold' : ''}`} style={{ left: at(expectancy) }}>
-                  {expectancy.toFixed(1)}
-                </span>
-              </span>
-            </li>
-          )
-        })}
-    </ul>
   )
 }

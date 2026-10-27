@@ -22,12 +22,15 @@ npm run typecheck && npm run lint
 
 ### Statistics
 
-Life tables come from the ONS (Open Government Licence v3.0); see `docs/adr/0002-life-tables.md`. The generated JSON
-in `src/data/` is committed. To refresh it:
+UK life tables, causes of death and life expectancy by area deprivation come from the ONS (Open Government Licence
+v3.0); see `docs/adr/0002-life-tables.md`. Other countries' life tables come from the UN: United Nations, Department of
+Economic and Social Affairs, Population Division (2024), *World Population Prospects 2024*, licensed under
+[CC BY 3.0 IGO](https://creativecommons.org/licenses/by/3.0/igo/). The generated JSON in `src/data/` and
+`public/data/countries/` is committed. To refresh it:
 
 ```sh
 npm run data:fetch   # downloads into data-cache/ (slow and polite: ONS rate-limits)
-npm run data:build   # parses, checks and writes src/data/mortality/*.json
+npm run data:build   # parses, checks and writes src/data/ and public/data/countries/
 ```
 
 ## Credit
