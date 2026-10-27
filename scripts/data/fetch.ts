@@ -14,7 +14,8 @@ for (const file of allFiles()) {
     const response = await fetch(file.url, { headers: { 'user-agent': 'your-life data pipeline (github.com/adambgme/project-life)' } })
     const body = new Uint8Array(await response.arrayBuffer())
     const isXlsx = body[0] === 0x50 && body[1] === 0x4b // "PK": a zip
-    if (response.ok && isXlsx) {
+    const isCsv = 'kind' in file && file.kind === 'csv' && new TextDecoder().decode(body.slice(0, 12)) === '"DATE_NAME",'
+    if (response.ok && (isXlsx || isCsv)) {
       writeFileSync(target, body)
       console.log(`fetched ${file.name} (${body.length} bytes)`)
       break

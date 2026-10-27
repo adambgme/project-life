@@ -1,8 +1,9 @@
 /** Turn the cached ONS spreadsheets into one JSON file per nation in src/data/mortality/. */
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { extendWithCohorts } from './combine.ts'
 import { MAX_AGE, parseQxSheet } from './onsQx.ts'
-import { NATIONS, PROJECTIONS, VARIANTS, qxFile } from './sources.ts'
+import { parseCausesCsv } from './nomisCauses.ts'
+import { CAUSES, NATIONS, PROJECTIONS, VARIANTS, qxFile } from './sources.ts'
 import { readSheetRows } from './xlsx.ts'
 
 /** Follow everyone alive today (born 1900 onwards) and anyone born before 2030 to age 100. */
@@ -48,3 +49,15 @@ for (const nation of NATIONS) {
   writeFileSync(new URL(`${nation}.json`, out), json + '\n')
   console.log(`${nation}.json: ${(json.length / 1024).toFixed(0)} KB`)
 }
+
+// Causes of death, England and Wales (latest registrations year).
+const causes = parseCausesCsv(readFileSync(new URL(`../../data-cache/${CAUSES.name}`, import.meta.url), 'utf8'))
+const causesOut = new URL('../../src/data/causes/', import.meta.url)
+mkdirSync(causesOut, { recursive: true })
+const causesJson = JSON.stringify({
+  area: 'England and Wales',
+  source: { title: CAUSES.title, url: CAUSES.page(causes.year), attribution: CAUSES.attribution, year: causes.year },
+  ...causes,
+})
+writeFileSync(new URL('england-wales.json', causesOut), causesJson + '\n')
+console.log(`causes/england-wales.json: ${(causesJson.length / 1024).toFixed(0)} KB (${causes.year}, ${causes.causes.length} causes)`)
