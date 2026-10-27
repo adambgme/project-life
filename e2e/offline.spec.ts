@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures'
+import { expect, openSettings, test } from './fixtures'
 
 test('the app can be installed: a manifest with icons', async ({ page, request, baseURL }) => {
   await page.goto('./')
@@ -26,6 +26,7 @@ test('after one visit everything works offline, other nations included', async (
   await page.getByLabel('Day', { exact: true }).fill('15')
   await page.getByLabel('Month', { exact: true }).selectOption({ label: 'June' })
   await page.getByLabel('Year', { exact: true }).fill('1990')
+  await openSettings(page)
   await page.getByLabel('Where you live').selectOption('wales')
   await expect(page.getByRole('status')).toHaveCount(0)
   await expect(page.getByTestId('life-expectancy')).toContainText('People like you live to about')

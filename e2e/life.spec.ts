@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import type { Page } from '@playwright/test'
-import { expect, test } from './fixtures'
+import { expect, openSettings, test } from './fixtures'
 
 // 26 Oct 2026, midday in London. Someone born 15 Jun 1990 is 36, and 133 days past their birthday
 // (week 19 of the row), so 36 × 52 + 19 = 1,891 weeks are fully lived and box 1,891 is this week.
@@ -202,6 +202,7 @@ test('the old page addresses still work', async ({ page }) => {
 test('the grid length comes from ONS life tables, and can be set by hand', async ({ page }) => {
   await page.goto('./')
   await enterBirthDate(page, '15', 'June', '1990')
+  await openSettings(page)
   const years = page.getByLabel('Grid length (years)')
   const summary = page.getByTestId('summary')
   const expectancy = page.getByTestId('life-expectancy')
@@ -238,6 +239,7 @@ test('the grid length comes from ONS life tables, and can be set by hand', async
   await expect(summary).toHaveText("You've lived 1,891 weeks, of the 4,680 on a 90-year grid.")
   await expect(page.locator('[role="gridcell"]')).toHaveCount(90 * 52)
   await page.reload()
+  await openSettings(page)
   await expect(years).toHaveValue('90')
   await expect(page.getByLabel('Where you live')).toHaveValue('scotland')
   await page.getByRole('button', { name: /Use the figures/ }).click()
@@ -265,8 +267,9 @@ test('if a nation\'s figures fail to load, the page says the UK\'s are shown', a
   await page.route(/scotland-.*\.js$/, (route) => route.abort())
   await page.goto('./')
   await enterBirthDate(page, '15', 'June', '1990')
+  await openSettings(page)
   await page.getByLabel('Where you live').selectOption('scotland')
-  await expect(page.getByRole('status')).toContainText("The figures for Scotland couldn't be loaded, so these are the UK's.")
+  await expect(page.getByRole('status').filter({ hasText: 'Scotland' })).toContainText("The figures for Scotland couldn't be loaded, so these are the UK's.")
   // The blocked download is expected to log a failed request; nothing else may.
   const unexpected = pageErrors.filter((e) => !e.includes('Failed to load resource'))
   pageErrors.splice(0, pageErrors.length, ...unexpected)

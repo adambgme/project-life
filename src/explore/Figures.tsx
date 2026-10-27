@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CalendarDate } from '../life/lifeMaths'
 import { chanceWords } from '../life/gridChances'
-import { ageAtChance, chanceOfReaching, deathRate, outlook, type Basis, type MortalityData } from '../life/mortality'
+import { ageAtChance, chanceOfReaching, deathRate, outlook, type MortalityData } from '../life/mortality'
 import { NATIONS, type Nation, type Profile } from '../life/store'
 import { loadNation, useMortality } from '../life/useMortality'
 import { CausesSection } from './CausesSection'
@@ -19,7 +19,7 @@ const NATION_NAMES: Record<Nation, string> = {
   'northern-ireland': 'Northern Ireland',
 }
 
-type Props = { profile: Profile; today: CalendarDate; isExample: boolean; onProfile: (profile: Profile) => void }
+type Props = { profile: Profile; today: CalendarDate; isExample: boolean }
 
 const percent = (p: number) => `${Math.round(p * 100)}%`
 /** "1 in 920" → rounded to 2 significant figures: "1 in 920"; tiny or certain risks in words. */
@@ -29,8 +29,9 @@ export function oneIn(q: number): string {
   return n <= 1 ? 'almost certain' : `1 in ${n.toLocaleString('en-GB')}`
 }
 
-/** The Explore page: the whole statistical picture for people like you, gently, with every source shown. */
-export function ExplorePage({ profile, today, isExample, onProfile }: Props) {
+/** "Your figures", below the grid: the whole statistical picture for people like you, gently, with every source
+ * shown. The choices behind it (sex, nation, cohort or period) live in Settings. */
+export function Figures({ profile, today, isExample }: Props) {
   const { data, status } = useMortality(profile.nation)
   // Until a nation's tables arrive (or if they can't), the figures are the UK's: say so, never label them otherwise.
   const shownNation: Nation = status === 'ready' ? profile.nation : 'uk'
@@ -78,77 +79,40 @@ export function ExplorePage({ profile, today, isExample, onProfile }: Props) {
   const who = isExample ? 'people like Sam' : 'people like you'
   const sexWords = profile.sex === 'both' ? 'both sexes averaged' : `${profile.sex}s`
   const section = 'flex flex-col gap-3 border-t border-rule pt-5'
-  const h2 = 'font-display text-2xl'
+  const h3 = 'font-display text-2xl'
   const source = `${data.source.attribution}. ${data.source.edition} life tables, released ${longDate(data.source.released)}.`
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-8 px-4 py-8 sm:px-8 sm:py-12">
-      <header className="flex flex-col gap-2 border-b border-ink pb-4">
-        <a href="./" className="text-sm text-ink-soft underline decoration-rule underline-offset-4 hover:text-ink">
-          ← Back to the grid
-        </a>
-        <p className="font-display text-xs tracking-[0.2em] text-ink-soft uppercase">Explore the figures</p>
-        <h1 className="font-display text-5xl font-semibold tracking-tight">How long people live</h1>
+    <section id="figures" aria-labelledby="figures-title" className="flex scroll-mt-4 flex-col gap-8 border-t border-ink pt-6 print:hidden">
+      <header className="flex flex-col gap-2">
+        <p className="font-display text-xs tracking-[0.2em] text-ink-soft uppercase">How long people live</p>
+        <h2 id="figures-title" className="font-display text-4xl font-semibold tracking-tight">
+          {isExample ? "Sam's figures" : 'Your figures'}
+        </h2>
       </header>
 
-      <main className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8">
         {isExample && (
-          <p className="border-l-2 border-today bg-paper-deep px-3 py-2 text-sm" data-testid="example">
-            These are the figures for Sam, the made-up example. Enter your date of birth on the grid page to see yours.
+          <p className="border-l-2 border-today bg-paper-deep px-3 py-2 text-sm" data-testid="example-figures">
+            These are the figures for Sam, the made-up example. Enter your date of birth above to see yours.
           </p>
         )}
         <p className="border-l-2 border-accent bg-paper-deep px-3 py-2" data-testid="wellbeing">
           These are averages for large groups of people. They can't say what will happen to any one person, and your
-          own health and circumstances matter far more. If any of this feels heavy, it's fine to close it. If you'd like
+          own health and circumstances matter far more. If any of this feels heavy, it's fine to skip it. If you'd like
           to talk to someone, Samaritans are there any time on <a className="underline" href="tel:116123">116 123</a>.
         </p>
 
         <p className="text-sm text-ink-soft">
           Figures for {who}: born {profile.birthDate.year}, {sexWords}, living in {NATION_NAMES[shownNation]}, aged{' '}
-          {from} today.
+          {from} today, using {profile.basis === 'cohort' ? 'projected (cohort)' : "this year's (period)"} death rates.
+          Change these in Settings.
         </p>
-        {status !== 'ready' && (
-          <p role="status" className="border-l-2 border-today bg-paper-deep px-3 py-2 text-sm">
-            {status === 'loading'
-              ? `Loading the figures for ${NATION_NAMES[profile.nation]}; these are the UK's meanwhile.`
-              : `The figures for ${NATION_NAMES[profile.nation]} couldn't be loaded, so these are the UK's. Try reloading the page.`}
-          </p>
-        )}
-
-        {!isExample && (
-          <fieldset className="flex flex-col gap-1">
-            <legend className="mb-1 text-sm text-ink-soft">Which death rates</legend>
-            <div className="flex flex-wrap gap-x-5 gap-y-1">
-              {(
-                [
-                  ['cohort', 'Projected (cohort)'],
-                  ['period', "This year's (period)"],
-                ] as [Basis, string][]
-              ).map(([basis, text]) => (
-                <label key={basis} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="explore-basis"
-                    checked={profile.basis === basis}
-                    onChange={() => onProfile({ ...profile, basis })}
-                    className="accent-accent"
-                  />
-                  {text}
-                </label>
-              ))}
-            </div>
-            <p className="text-xs text-ink-soft">
-              {profile.basis === 'cohort'
-                ? 'Cohort figures assume death rates keep improving as ONS projects.'
-                : "Period figures assume this year's death rates never change: the usual headline figure, but not a real forecast for anyone."}
-            </p>
-          </fieldset>
-        )}
 
         <section className={section} aria-labelledby="survival-title">
-          <h2 id="survival-title" className={h2}>
+          <h3 id="survival-title" className={h3}>
             Your survival curve
-          </h2>
+          </h3>
           <p>
             Of 100 {who} alive at {from} today, how many are still alive at each later age. On average they live to about{' '}
             <strong className="font-semibold">{Math.round(principal.lifeExpectancy)}</strong>. The shaded band runs from
@@ -176,9 +140,9 @@ export function ExplorePage({ profile, today, isExample, onProfile }: Props) {
         </section>
 
         <section className={section} aria-labelledby="reach-title">
-          <h2 id="reach-title" className={h2}>
+          <h3 id="reach-title" className={h3}>
             Chance of reaching each age
-          </h2>
+          </h3>
           {reach.length === 0 && <p>You've already reached every age on this list.</p>}
           <table className={`w-full max-w-md text-left ${reach.length ? '' : 'hidden'}`} data-testid="reach-table">
             <thead>
@@ -205,9 +169,9 @@ export function ExplorePage({ profile, today, isExample, onProfile }: Props) {
         </section>
 
         <section className={section} aria-labelledby="risk-title">
-          <h2 id="risk-title" className={h2}>
+          <h3 id="risk-title" className={h3}>
             Yearly risk, from here on
-          </h2>
+          </h3>
           <p>
             The chance of dying within the year at each age. It's low for decades and then rises steeply, roughly
             doubling every eight years in later life, so the scale goes up in steps of ten.
@@ -228,9 +192,9 @@ export function ExplorePage({ profile, today, isExample, onProfile }: Props) {
         </section>
 
         <section className={section} aria-labelledby="causes-title">
-          <h2 id="causes-title" className={h2}>
+          <h3 id="causes-title" className={h3}>
             What people your age most often die of
-          </h2>
+          </h3>
           <p className="text-sm text-ink-soft">
             At younger ages deaths are rare and often sudden; later on, long illnesses take over. Choose an age to see how
             it changes.
@@ -239,9 +203,9 @@ export function ExplorePage({ profile, today, isExample, onProfile }: Props) {
         </section>
 
         <section className={section} aria-labelledby="nations-title">
-          <h2 id="nations-title" className={h2}>
+          <h3 id="nations-title" className={h3}>
             Across the UK
-          </h2>
+          </h3>
           <p>Average age at death for {who}, by where in the UK they live.</p>
           {nations === null ? (
             <p className="text-sm text-ink-soft">Loading the four nations' figures…</p>
@@ -266,20 +230,20 @@ export function ExplorePage({ profile, today, isExample, onProfile }: Props) {
         </section>
 
         <section className={section} aria-labelledby="deprivation-title">
-          <h2 id="deprivation-title" className={h2}>
+          <h3 id="deprivation-title" className={h3}>
             Rich and poor neighbourhoods
-          </h2>
+          </h3>
           <DeprivationSection nation={profile.nation} sex={profile.sex} age={from} who={who} />
         </section>
 
         <section className={section} aria-labelledby="country-title">
-          <h2 id="country-title" className={h2}>
+          <h3 id="country-title" className={h3}>
             If you lived in another country
-          </h2>
+          </h3>
           <p>How the outlook for {who} would compare if they lived somewhere else.</p>
           <CountrySection birthDate={profile.birthDate} today={today} options={options} who={who} />
         </section>
-      </main>
-    </div>
+      </div>
+    </section>
   )
 }
