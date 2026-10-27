@@ -88,6 +88,10 @@ test('someone over 100 still gets the page', async ({ page }) => {
   await expect(page.getByText("You've already reached every age on this list.")).toBeVisible()
 })
 
+test.describe('without the offline cache', () => {
+  // The service worker would serve the cached file; these tests need the download itself to fail.
+  test.use({ serviceWorkers: 'block' })
+
 test('while a nation is loading or fails, Explore says the figures are the UK\'s', async ({ page, pageErrors }) => {
   await page.route(/scotland-.*\.js$/, (route) => route.abort())
   await seed(page, PROFILE)
@@ -97,4 +101,5 @@ test('while a nation is loading or fails, Explore says the figures are the UK\'s
   )
   await expect(page.getByText('living in United Kingdom')).toBeVisible()
   pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !e.includes('Failed to load resource')))
+})
 })
