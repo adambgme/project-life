@@ -4,12 +4,14 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const base = '/project-life/'
+
 export default defineConfig({
-  base: '/project-life/',
+  base,
   plugins: [
     react(),
     tailwindcss(),
-    // Installable and offline: everything the app needs, every nation's tables included, is precached from this
+    // Installable and offline: everything the app needs, every UK nation's tables included, is precached from this
     // site. New versions wait for the person to choose to reload (registerType: 'prompt').
     VitePWA({
       registerType: 'prompt',
@@ -19,8 +21,8 @@ export default defineConfig({
         name: 'Your Life',
         short_name: 'Your Life',
         description: 'Your life in weeks: a private life calendar. Nothing you enter leaves your device.',
-        start_url: '/project-life/',
-        scope: '/project-life/',
+        start_url: base,
+        scope: base,
         display: 'standalone',
         background_color: '#f5efe3',
         theme_color: '#f5efe3',
@@ -41,6 +43,15 @@ export default defineConfig({
         // The first visit is offline-ready without a reload. Updates still wait (no skipWaiting): the new worker
         // only takes over when the person chooses Reload.
         clientsClaim: true,
+        // Other countries' tables (237 files) aren't precached: each is fetched from this site when picked, then kept
+        // for offline use, refreshed in the background when online.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith(`${base}data/countries/`),
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'countries', expiration: { maxEntries: 30 } },
+          },
+        ],
       },
     }),
   ],

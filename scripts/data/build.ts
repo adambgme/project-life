@@ -1,9 +1,14 @@
-/** Turn the cached ONS spreadsheets into one JSON file per nation in src/data/mortality/. */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+/** Turn the cached sources into the JSON the app uses: one file per UK nation in src/data/mortality/ (bundled), one
+ * per country in public/data/countries/ (fetched from the site when picked), causes and deprivation in src/data/. */
+import { createReadStream, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createInterface } from 'node:readline'
+import { createGunzip } from 'node:zlib'
 import { extendWithCohorts } from './combine.ts'
 import { MAX_AGE, parseQxSheet } from './onsQx.ts'
 import { parseCausesCsv } from './nomisCauses.ts'
-import { CAUSES, NATIONS, PROJECTIONS, VARIANTS, qxFile } from './sources.ts'
+import { parseDeprivation } from './onsDeprivation.ts'
+import { CAUSES, DEPRIVATION, NATIONS, PROJECTIONS, VARIANTS, WPP, qxFile } from './sources.ts'
+import { WPP_MAX_AGE, checkPlausible, readWpp, type WppCountry } from './wpp.ts'
 import { readSheetRows } from './xlsx.ts'
 
 /** Follow everyone alive today (born 1900 onwards) and anyone born before 2030 to age 100. */
@@ -61,3 +66,52 @@ const causesJson = JSON.stringify({
 })
 writeFileSync(new URL('england-wales.json', causesOut), causesJson + '\n')
 console.log(`causes/england-wales.json: ${(causesJson.length / 1024).toFixed(0)} KB (${causes.year}, ${causes.causes.length} causes)`)
+
+// Other countries (UN WPP 2024, medium variant): one file each, in the same encoding as the nations' tables.
+const bySex: Record<string, Map<string, WppCountry>> = {}
+for (const file of WPP.files) {
+  const reader = readWpp(file.sex)
+  const input = createReadStream(new URL(`../../data-cache/${file.name}`, import.meta.url)).pipe(createGunzip())
+  for await (const line of createInterface({ input })) reader.line(line)
+  bySex[file.sex] = reader.finish()
+  bySex[file.sex]!.forEach(checkPlausible)
+  // WPP 2024 covers 237 countries and areas; far fewer means the file or its layout changed.
+  if (bySex[file.sex]!.size < 230) throw new Error(`WPP ${file.sex}: only ${bySex[file.sex]!.size} countries`)
+}
+const countriesOut = new URL('../../public/data/countries/', import.meta.url)
+rmSync(countriesOut, { recursive: true, force: true })
+mkdirSync(countriesOut, { recursive: true })
+const index: { code: string; name: string }[] = []
+let countryBytes = 0
+for (const [code, male] of bySex.male!) {
+  const female = bySex.female!.get(code)
+  if (!female) throw new Error(`WPP: ${code} has male tables but no female ones`)
+  const encode = (c: WppCountry) => ({ principal: differences(c.qx.map((ages) => ages.map((q) => fourFigures(Math.round(q * 100_000 * SCALE))))) })
+  const json = JSON.stringify({
+    nation: code.toLowerCase(),
+    name: male.name,
+    source: { ...WPP, files: undefined },
+    firstYear: male.firstYear,
+    lastYear: male.firstYear + male.qx.length - 1,
+    maxAge: WPP_MAX_AGE,
+    scale: SCALE,
+    encoding: 'year-differences',
+    rates: { male: encode(male), female: encode(female) },
+  })
+  writeFileSync(new URL(`${code.toLowerCase()}.json`, countriesOut), json + '\n')
+  countryBytes += json.length
+  index.push({ code: code.toLowerCase(), name: male.name })
+}
+index.sort((a, b) => a.name.localeCompare(b.name, 'en-GB'))
+writeFileSync(new URL('../../src/data/countries.json', import.meta.url), JSON.stringify(index) + '\n')
+console.log(`countries: ${index.length} files, ${(countryBytes / 1024 / 1024).toFixed(1)} MB in all`)
+
+// Life expectancy by area deprivation (England: tenths; Wales: fifths).
+const deprivation: Record<string, unknown> = {}
+for (const file of DEPRIVATION.files) {
+  const path = new URL(`../../data-cache/${file.name}`, import.meta.url)
+  deprivation[file.nation] = parseDeprivation(await readSheetRows(path, '1'), await readSheetRows(path, '4'))
+}
+const deprivationJson = JSON.stringify({ source: { ...DEPRIVATION, files: undefined }, ...deprivation })
+writeFileSync(new URL('../../src/data/deprivation.json', import.meta.url), deprivationJson + '\n')
+console.log(`deprivation.json: ${(deprivationJson.length / 1024).toFixed(0)} KB`)

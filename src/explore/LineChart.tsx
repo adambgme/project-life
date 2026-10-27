@@ -3,8 +3,12 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEve
 export type Point = { x: number; y: number; lo?: number; hi?: number }
 
 type Props = {
-  /** One series; `lo`/`hi` draw an uncertainty band as a light wash. */
+  /** The main series; `lo`/`hi` draw an uncertainty band as a light wash. */
   points: Point[]
+  /** A second series to compare against, at the same x values: drawn dashed, so it never relies on colour. With it,
+   * both series are named in a legend, the readout and the table; `label` names the main one. */
+  compare?: { label: string; points: Point[] }
+  label?: string
   /** What the chart shows, for screen readers (the visible title is outside). */
   summary: string
   yScale?: 'linear' | 'log'
@@ -37,10 +41,10 @@ function useWidth<T extends Element>() {
   return [ref, width] as const
 }
 
-/** A single-series line chart with an optional band: 2px line, 10% wash, hairline grid, crosshair readout on hover
+/** A line chart (one series, or two to compare) with an optional band: 2px line, 10% wash, hairline grid, crosshair readout on hover
  * and with the arrow keys, and a table view so no value depends on hovering. */
 export function LineChart(props: Props) {
-  const { points, summary, yScale = 'linear', yDomain, yTicks, formatY, xTicks, xLabel, marks = [], describe, table } = props
+  const { points, compare, label, summary, yScale = 'linear', yDomain, yTicks, formatY, xTicks, xLabel, marks = [], describe, table } = props
   const id = useId()
   const [active, setActive] = useState<number | null>(null)
   const [frame, measured] = useWidth<HTMLDivElement>()
@@ -55,7 +59,9 @@ export function LineChart(props: Props) {
       : (y - yDomain[0]) / (yDomain[1] - yDomain[0])
   const sy = (y: number) => H - M.bottom - Math.min(1, Math.max(0, toUnit(y))) * (H - M.top - M.bottom)
 
-  const line = points.map((p, i) => `${i ? 'L' : 'M'}${sx(p.x).toFixed(1)} ${sy(p.y).toFixed(1)}`).join('')
+  const path = (series: Point[]) => series.map((p, i) => `${i ? 'L' : 'M'}${sx(p.x).toFixed(1)} ${sy(p.y).toFixed(1)}`).join('')
+  const line = path(points)
+  const comparing = (i: number) => compare?.points[i]
   const banded = points.filter((p) => p.lo !== undefined && p.hi !== undefined)
   const band = banded.length
     ? banded.map((p, i) => `${i ? 'L' : 'M'}${sx(p.x).toFixed(1)} ${sy(p.hi!).toFixed(1)}`).join('') +
@@ -80,10 +86,27 @@ export function LineChart(props: Props) {
   }
 
   const p = active === null ? null : points[active]!
+  const c = active === null ? undefined : comparing(active)
   const readout = p && describe(p)
+  const dashed = '6 4'
 
   return (
     <div className="flex flex-col gap-2">
+      {compare && (
+        <ul className="flex flex-wrap gap-x-5 gap-y-1 text-sm" aria-hidden data-testid="chart-legend">
+          {[
+            { name: label, dash: undefined, colour: 'var(--color-accent)' },
+            { name: compare.label, dash: dashed, colour: 'var(--color-ink)' },
+          ].map((item) => (
+            <li key={item.name} className="flex items-center gap-2">
+              <svg width="28" height="8" aria-hidden>
+                <line x1="1" x2="27" y1="4" y2="4" stroke={item.colour} strokeWidth={2} strokeDasharray={item.dash} strokeLinecap="round" />
+              </svg>
+              {item.name}
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="relative" ref={frame}>
         <svg
           viewBox={`0 0 ${W} ${H}`}
@@ -115,6 +138,7 @@ export function LineChart(props: Props) {
             {xLabel}
           </text>
           {band && <path d={band} fill="var(--color-accent)" fillOpacity={0.12} />}
+          {compare && <path d={path(compare.points)} fill="none" stroke="var(--color-ink)" strokeWidth={2} strokeDasharray={dashed} strokeLinejoin="round" />}
           <path d={line} fill="none" stroke="var(--color-accent)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
           {marks.map((m) => {
             const at = points.reduce((a, b) => (Math.abs(b.x - m.x) < Math.abs(a.x - m.x) ? b : a))
@@ -131,6 +155,7 @@ export function LineChart(props: Props) {
             <g aria-hidden>
               <line x1={sx(p.x)} x2={sx(p.x)} y1={M.top} y2={H - M.bottom} stroke="var(--color-ink-soft)" strokeWidth={1} />
               <circle cx={sx(p.x)} cy={sy(p.y)} r={4.5} fill="var(--color-accent)" stroke="var(--color-paper)" strokeWidth={2} />
+              {c && <circle cx={sx(c.x)} cy={sy(c.y)} r={4.5} fill="var(--color-ink)" stroke="var(--color-paper)" strokeWidth={2} />}
             </g>
           )}
         </svg>
@@ -143,7 +168,15 @@ export function LineChart(props: Props) {
         >
           {readout && (
             <>
-              <strong className="block font-semibold">{readout.value}</strong>
+              <strong className="block font-semibold">
+                {compare ? `${label}: ` : ''}
+                {readout.value}
+              </strong>
+              {c && compare && (
+                <strong className="block font-semibold">
+                  {compare.label}: {describe(c).value}
+                </strong>
+              )}
               <span className="text-ink-soft">{readout.detail}</span>
             </>
           )}
@@ -155,18 +188,20 @@ export function LineChart(props: Props) {
           <thead>
             <tr className="border-b border-rule">
               <th className="py-1 font-normal text-ink-soft">{table.xHeader}</th>
-              <th className="py-1 font-normal text-ink-soft">{table.yHeader}</th>
+              <th className="py-1 font-normal text-ink-soft">{compare ? label : table.yHeader}</th>
+              {compare && <th className="py-1 font-normal text-ink-soft">{compare.label}</th>}
             </tr>
           </thead>
           <tbody>
-            {points
-              .filter((pt) => pt.x % table.every === 0)
-              .map((pt) => (
+            {points.map((pt, i) =>
+              pt.x % table.every === 0 ? (
                 <tr key={pt.x} className="border-b border-rule/60">
                   <td className="py-0.5">{pt.x}</td>
                   <td className="py-0.5">{describe(pt).value}</td>
+                  {compare && <td className="py-0.5">{describe(comparing(i)!).value}</td>}
                 </tr>
-              ))}
+              ) : null,
+            )}
           </tbody>
         </table>
       </details>
