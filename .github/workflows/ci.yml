@@ -3,6 +3,9 @@ name: CI
 on:
   pull_request:
   workflow_call:
+  # The monthly data refresh starts CI on its PR branch this way: GitHub doesn't run workflows for a PR opened with
+  # the workflow's own token, but a dispatch does run, and its checks count for the PR's head commit.
+  workflow_dispatch:
 
 permissions:
   contents: read

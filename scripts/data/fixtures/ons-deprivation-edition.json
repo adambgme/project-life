@@ -1,0 +1,13 @@
+{
+ "type": "dataset",
+ "uri": "/peoplepopulationandcommunity/healthandsocialcare/healthinequalities/datasets/healthylifeexpectancybynationalareadeprivationenglandtimeseries/between2013to2015and2022to2024",
+ "downloads": [
+  {
+   "file": "hleimd2224eng.xlsx"
+  }
+ ],
+ "description": {
+  "releaseDate": "2026-04-14T23:00:00.000Z",
+  "edition": "Between 2013 to 2015 and 2022 to 2024"
+ }
+}

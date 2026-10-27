@@ -1,0 +1,15 @@
+{
+  "projections": {
+    "edition": "2024based",
+    "released": "2026-05-15",
+    "url": "https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/bulletins/pastandprojecteddatafromtheperiodandcohortlifetables/2024baseduk1981to2074"
+  },
+  "deprivation": {
+    "edition": "between2013to2015and2022to2024",
+    "released": "2026-04-15"
+  },
+  "wpp": {
+    "revision": 2024,
+    "released": "2024-07-11"
+  }
+}

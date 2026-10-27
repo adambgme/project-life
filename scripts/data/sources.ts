@@ -4,6 +4,11 @@
  * committed, and the parsers are tested on small saved extracts.
  */
 
+import { deprivationFile, projectionsLabel, qxFileName, readEditions, wppFileName } from './editions.ts'
+
+/** The editions in use (scripts/data/editions.json, updated by the monthly refresh: see refresh.ts). */
+const EDITIONS = readEditions()
+
 export const NATIONS = ['uk', 'england', 'wales', 'scotland', 'northern-ireland'] as const
 export type Nation = (typeof NATIONS)[number]
 
@@ -11,52 +16,59 @@ export const VARIANTS = ['principal', 'high', 'low'] as const
 export type Variant = (typeof VARIANTS)[number]
 
 const ONS = 'https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets'
+const ONS_PAGES = 'https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets'
 
-const nationCode: Record<Nation, { code: string; slug: string }> = {
-  uk: { code: 'uk', slug: 'unitedkingdom' },
-  england: { code: 'en', slug: 'england' },
-  wales: { code: 'wa', slug: 'wales' },
-  scotland: { code: 'sc', slug: 'scotland' },
-  'northern-ireland': { code: 'ni', slug: 'northernireland' },
+const nationSlug: Record<Nation, string> = {
+  uk: 'unitedkingdom',
+  england: 'england',
+  wales: 'wales',
+  scotland: 'scotland',
+  'northern-ireland': 'northernireland',
 }
 
-const variantCode: Record<Variant, { code: string; slug: string }> = {
-  principal: { code: 'ppp', slug: 'principalprojection' },
-  high: { code: 'php', slug: 'highlifeexpectancyvariant' },
-  low: { code: 'plp', slug: 'lowlifeexpectancyvariant' },
+const variantSlug: Record<Variant, string> = {
+  principal: 'principalprojection',
+  high: 'highlifeexpectancyvariant',
+  low: 'lowlifeexpectancyvariant',
 }
 
-/** The edition in use: ONS 2024-based past and projected period and cohort life tables, released 15 May 2026. */
+/** The ONS dataset page for one nation's and variant's mortality rates (its editions live beneath it). */
+export const qxDataset = (nation: Nation, variant: Variant) => `${ONS_PAGES}/mortalityratesqx${variantSlug[variant]}${nationSlug[nation]}`
+
+/** The edition in use of ONS past and projected period and cohort life tables. */
+const projections = EDITIONS.projections
 export const PROJECTIONS = {
-  edition: '2024-based',
-  released: '2026-05-15',
-  title: 'Past and projected period and cohort life tables, 2024-based, UK: 1981 to 2074',
-  url: 'https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/bulletins/pastandprojecteddatafromtheperiodandcohortlifetables/2024baseduk1981to2074',
+  edition: projectionsLabel(projections.edition),
+  released: projections.released,
+  title: `Past and projected period and cohort life tables, ${projectionsLabel(projections.edition)}, UK`,
+  url: projections.url,
   attribution: 'Source: Office for National Statistics licensed under the Open Government Licence v3.0',
   licence: 'https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/',
 }
 
 export function qxFile(nation: Nation, variant: Variant) {
-  const n = nationCode[nation]
-  const v = variantCode[variant]
-  const name = `${n.code}${v.code}24qx.xlsx`
-  return { name, url: `${ONS}/mortalityratesqx${v.slug}${n.slug}/2024based/${name}` }
+  const name = qxFileName(nation, variant, projections.edition)
+  return { name, url: `${ONS}/mortalityratesqx${variantSlug[variant]}${nationSlug[nation]}/${projections.edition}/${name}` }
 }
 
 /** Published ONS figures used only to check the model in tests (not bundled). */
+const reference = (dataset: string, kind: 'ex' | 'lx') => {
+  const name = qxFileName('uk', 'principal', projections.edition).replace('qx', kind)
+  return { name, url: `${ONS}/${dataset}/${projections.edition}/${name}` }
+}
 export const REFERENCE_FILES = [
-  { name: 'ukppp24ex.xlsx', url: `${ONS}/expectationoflifeprincipalprojectionunitedkingdom/2024based/ukppp24ex.xlsx` },
-  { name: 'ukppp24lx.xlsx', url: `${ONS}/numberssurvivingatexactagelxprincipalprojectionunitedkingdom/2024based/ukppp24lx.xlsx` },
+  reference('expectationoflifeprincipalprojectionunitedkingdom', 'ex'),
+  reference('numberssurvivingatexactagelxprincipalprojectionunitedkingdom', 'lx'),
 ]
 
 /** A file to cache: an xlsx workbook unless `kind` says otherwise. */
-export type SourceFile = { name: string; url: string; kind?: 'csv' | 'gzip' }
+export type SourceFile = { name: string; url: string; kind?: 'csv' | 'gzip'; /** Always download afresh (the source serves its latest data under the same name). */ fresh?: boolean }
 
 export function allFiles(): SourceFile[] {
   return [
     ...NATIONS.flatMap((nation) => VARIANTS.map((variant) => qxFile(nation, variant))),
     ...REFERENCE_FILES,
-    { name: CAUSES.name, url: CAUSES.url, kind: 'csv' as const },
+    { name: CAUSES.name, url: CAUSES.url, kind: 'csv' as const, fresh: true },
     ...WPP.files.map((file) => ({ ...file, kind: 'gzip' as const })),
     ...DEPRIVATION.files,
   ]
@@ -78,18 +90,19 @@ export const CAUSES = {
   attribution: 'Source: Office for National Statistics licensed under the Open Government Licence v3.0',
 }
 
-/** UN World Population Prospects 2024: complete (single-age) life tables, medium variant, for 237 countries and areas,
- * projected 2024–2100. Over 200 MB each, so fetched once; the build splits them into one small file per country. */
-const WPP_CSV = 'https://population.un.org/wpp/assets/Excel%20Files/1_Indicator%20(Standard)/CSV_FILES'
+/** UN World Population Prospects: complete (single-age) life tables, medium variant, for 237 countries and areas,
+ * projected to 2100. Over 200 MB each, so fetched once; the build splits them into one small file per country. */
+export const WPP_CSV = 'https://population.un.org/wpp/assets/Excel%20Files/1_Indicator%20(Standard)/CSV_FILES'
+const wpp = EDITIONS.wpp
 export const WPP = {
-  edition: '2024',
-  released: '2024-07-11',
-  title: 'World Population Prospects 2024, Online Edition',
+  edition: String(wpp.revision),
+  released: wpp.released,
+  title: `World Population Prospects ${wpp.revision}, Online Edition`,
   url: 'https://population.un.org/wpp/',
-  attribution: 'Source: United Nations, Department of Economic and Social Affairs, Population Division (2024). World Population Prospects 2024',
+  attribution: `Source: United Nations, Department of Economic and Social Affairs, Population Division (${wpp.revision}). World Population Prospects ${wpp.revision}`,
   licence: 'https://creativecommons.org/licenses/by/3.0/igo/',
   files: (['Male', 'Female'] as const).map((sex) => {
-    const name = `WPP2024_Life_Table_Complete_Medium_${sex}_2024-2100.csv.gz`
+    const name = wppFileName(wpp.revision, sex)
     return { sex: sex === 'Male' ? ('male' as const) : ('female' as const), name, url: `${WPP_CSV}/${name}` }
   }),
 }
@@ -97,13 +110,20 @@ export const WPP = {
 /** ONS life expectancy and healthy life expectancy by national area deprivation (England: tenths of the IMD; Wales:
  * fifths of the WIMD), latest three-year period. */
 const HLE = 'https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/healthandsocialcare/healthinequalities/datasets'
+export const HLE_PAGES = 'https://www.ons.gov.uk/peoplepopulationandcommunity/healthandsocialcare/healthinequalities/datasets'
+export const DEPRIVATION_DATASETS = {
+  england: 'healthylifeexpectancybynationalareadeprivationenglandtimeseries',
+  wales: 'healthylifeexpectancybynationalareadeprivationwalestimeseries',
+} as const
+const deprivation = EDITIONS.deprivation
 export const DEPRIVATION = {
-  released: '2026-04-15',
-  title: 'Healthy life expectancy by national area deprivation, England and Wales: between 2013 to 2015 and 2022 to 2024',
-  url: 'https://www.ons.gov.uk/peoplepopulationandcommunity/healthandsocialcare/healthinequalities/bulletins/healthylifeexpectancybynationalareadeprivationenglandandwales/between2013to2015and2022to2024',
+  released: deprivation.released,
+  title: 'Healthy life expectancy by national area deprivation, England and Wales',
+  // The bulletin for each edition shares the edition's name.
+  url: `https://www.ons.gov.uk/peoplepopulationandcommunity/healthandsocialcare/healthinequalities/bulletins/healthylifeexpectancybynationalareadeprivationenglandandwales/${deprivation.edition}`,
   attribution: 'Source: Office for National Statistics licensed under the Open Government Licence v3.0',
-  files: [
-    { nation: 'england' as const, name: 'hleimd2224eng.xlsx', url: `${HLE}/healthylifeexpectancybynationalareadeprivationenglandtimeseries/between2013to2015and2022to2024/hleimd2224eng.xlsx` },
-    { nation: 'wales' as const, name: 'hleimd2224wal.xlsx', url: `${HLE}/healthylifeexpectancybynationalareadeprivationwalestimeseries/between2013to2015and2022to2024/hleimd2224wal.xlsx` },
-  ],
+  files: (['england', 'wales'] as const).map((nation) => {
+    const name = deprivationFile(deprivation.edition, nation === 'england' ? 'eng' : 'wal')
+    return { nation, name, url: `${HLE}/${DEPRIVATION_DATASETS[nation]}/${deprivation.edition}/${name}` }
+  }),
 }
