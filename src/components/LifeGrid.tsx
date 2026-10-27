@@ -202,13 +202,18 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
         : 'Your life in years: ten years per row'
 
   return (
-    <figure className={`flex w-full flex-col gap-2 ${layout.maxWidth}`}>
+    <figure className={`flex w-full flex-col gap-2 ${layout.maxWidth} print:max-w-(--print-grid-width)`} data-testid="grid-figure">
       <div aria-hidden className="flex items-end text-[10px] text-ink-soft">
         <span className="w-8 shrink-0 pr-2 text-right whitespace-nowrap">Age ↓</span>
         <span className="font-display tracking-[0.12em] uppercase">{layout.columnTitle} →</span>
       </div>
       {layout.columnMarks.length > 0 && (
-        <div aria-hidden className="ml-8 grid text-[10px] text-ink-soft tabular-nums" style={{ gridTemplateColumns: `repeat(${layout.perRow}, minmax(0, 1fr))` }}>
+        <div
+          aria-hidden
+          className={`ml-8 grid text-[10px] text-ink-soft tabular-nums ${chances ? 'mr-10' : ''}`}
+          style={{ gridTemplateColumns: `repeat(${layout.perRow}, minmax(0, 1fr))` }}
+          data-testid="column-marks"
+        >
           {layout.columnMarks.map((mark) => (
             <span
               key={mark}
@@ -220,7 +225,7 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
           ))}
         </div>
       )}
-      <p aria-hidden className="min-h-5 truncate text-xs text-ink-soft" data-testid="box-details">
+      <p aria-hidden className="min-h-5 truncate text-xs text-ink-soft print:hidden" data-testid="box-details">
         {detailIndex !== null &&
           [
             cellLabel(view, detailIndex, birthDate, todayIndex),
@@ -298,7 +303,7 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
                         (state === 'lived'
                           ? 'border-accent bg-accent'
                           : state === 'today'
-                            ? 'border-today bg-today ring-1 ring-today ring-offset-1 ring-offset-paper'
+                            ? 'border-today bg-today ring-2 ring-ink ring-offset-1 ring-offset-paper'
                             : 'border-rule bg-transparent')
                       }
                     />
