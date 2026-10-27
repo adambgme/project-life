@@ -257,6 +257,10 @@ test('a date saved by the first version of the new app keeps working', async ({ 
   await expect(page.getByLabel('Where you live')).toHaveValue('uk')
 })
 
+test.describe('without the offline cache', () => {
+  // The service worker would serve the cached file; these tests need the download itself to fail.
+  test.use({ serviceWorkers: 'block' })
+
 test('if a nation\'s figures fail to load, the page says the UK\'s are shown', async ({ page, pageErrors }) => {
   await page.route(/scotland-.*\.js$/, (route) => route.abort())
   await page.goto('./')
@@ -266,6 +270,7 @@ test('if a nation\'s figures fail to load, the page says the UK\'s are shown', a
   // The blocked download is expected to log a failed request; nothing else may.
   const unexpected = pageErrors.filter((e) => !e.includes('Failed to load resource'))
   pageErrors.splice(0, pageErrors.length, ...unexpected)
+})
 })
 
 test('the example life shows a made-up story that can\'t be edited', async ({ page }) => {
