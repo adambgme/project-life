@@ -18,6 +18,8 @@ import { boxChances } from './life/gridChances'
 import { exportFile, readLinkFragment } from './life/transfer'
 import { readPage, readView, writeView } from './life/viewParam'
 import { ExplorePage } from './explore/ExplorePage'
+import { PrintShareDialog } from './share/PrintShareDialog'
+import { resolveColour, type DrawInput } from './share/drawLife'
 
 const UNIT: Record<View, string> = { weeks: 'weeks', months: 'months', years: 'years' }
 
@@ -38,6 +40,7 @@ export function App() {
   const profile = shown.profile!
   const [panel, setPanel] = useState<PanelMode | null>(null)
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null)
+  const [sharing, setSharing] = useState(false)
 
   // A "send to my phone" link, on load or opened into a tab that already has the page: offer its contents.
   useEffect(() => {
@@ -119,6 +122,34 @@ export function App() {
     writeView(next)
   }
 
+  /** The grid as the share image and poster see it (colours resolved for the canvas). */
+  const drawing = (labels: boolean): DrawInput => {
+    const css = (name: string) => resolveColour(`var(--color-${name})`)
+    return {
+      view,
+      years: gridYears,
+      todayIndex: boxIndex(view, birthDate, today),
+      story,
+      eras: erasById,
+      moments: momentsById,
+      goals: goalsById,
+      colours: {
+        paper: css('paper'),
+        ink: css('ink'),
+        inkSoft: css('ink-soft'),
+        rule: css('rule'),
+        lived: css('accent'),
+        today: css('today'),
+        accent: css('accent'),
+        category: (category) => resolveColour(categoryColour(category, colours)),
+      },
+      chances,
+      labels,
+      title: 'Your Life',
+      subtitle: `A life in ${UNIT[view]}`,
+    }
+  }
+
   if (page === 'explore') {
     if (life.profile?.statistics === 'hidden') {
       return (
@@ -145,26 +176,29 @@ export function App() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-8 px-4 py-8 sm:px-8 sm:py-12">
-      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-4">
+    <div className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-8 px-4 py-8 sm:px-8 sm:py-12 print:min-h-0 print:max-w-none print:gap-3 print:p-0">
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-4" data-print-part>
         <div>
           <p className="font-display text-xs tracking-[0.2em] text-ink-soft uppercase">
             A life in {UNIT[view]}
           </p>
           <h1 className="font-display text-5xl font-semibold tracking-tight sm:text-6xl">Your Life</h1>
         </div>
-        <ViewToggle view={view} onChange={changeView} />
+        <div className="print:hidden">
+          <ViewToggle view={view} onChange={changeView} />
+        </div>
       </header>
 
       {!storageAvailable && (
-        <p role="status" className="border-l-2 border-today bg-paper-deep px-3 py-2 text-sm">
+        <p role="status" className="border-l-2 border-today bg-paper-deep px-3 py-2 text-sm print:hidden">
           {newerSave
             ? 'This browser has your life saved by a newer version of this page. Reload to see it; nothing here will be saved until then.'
             : "This browser isn't letting the page save anything, so your date will be forgotten when you leave."}
         </p>
       )}
 
-      <main className="flex flex-col gap-6">
+      <main className="flex flex-col gap-6 print:gap-3">
+        <div className="print:hidden">
         <BirthDateForm
           birthDate={life.profile?.birthDate ?? null}
           today={today}
@@ -174,6 +208,7 @@ export function App() {
           canForget={!!life.profile || waitingForDate}
           onForget={forget}
         />
+        </div>
         {!life.profile && (
           <p className="-mt-3 text-sm text-ink-soft">
             Have a backup?{' '}
@@ -181,6 +216,7 @@ export function App() {
           </p>
         )}
         {life.profile && (
+          <div className="print:hidden">
           <YourDetails
             profile={life.profile}
             suggestedYears={suggestedYears}
@@ -192,6 +228,7 @@ export function App() {
             source={mortality.source}
             onChange={(next) => setLife({ ...life, profile: next })}
           />
+          </div>
         )}
         {waitingForDate ? (
           <p role="status" className="border-l-2 border-accent bg-paper-deep px-3 py-2" data-testid="waiting">
@@ -200,7 +237,7 @@ export function App() {
           </p>
         ) : (
         <>
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1" data-print-part>
           {isExample && (
             <p className="font-display text-sm tracking-[0.12em] text-today uppercase" data-testid="example">
               An example: {EXAMPLE.name}'s life
@@ -221,13 +258,16 @@ export function App() {
           )}
         </div>
         {!isExample && (
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 print:hidden">
             <button
               type="button"
               onClick={() => setPanel({ kind: 'list' })}
               className="rounded-sm bg-ink px-4 py-2 font-display text-paper"
             >
               Your story
+            </button>
+            <button type="button" onClick={() => setSharing(true)} className="rounded-sm border border-ink px-4 py-2 font-display">
+              Print or share
             </button>
             <span className="text-sm text-ink-soft">
               {storyCount === 0
@@ -275,6 +315,9 @@ export function App() {
             onPendingImport={setPendingImport}
           />
         )}
+        {life.profile && (
+          <PrintShareDialog open={sharing} onClose={() => setSharing(false)} drawing={drawing} fileName={`your-life-${view}.png`} />
+        )}
         <ImportDialog
           pending={pendingImport}
           current={life}
@@ -287,7 +330,7 @@ export function App() {
         />
       </main>
 
-      <footer className="mt-auto border-t border-rule pt-4 text-sm text-ink-soft">
+      <footer className="mt-auto border-t border-rule pt-4 text-sm text-ink-soft print:hidden">
         <p>Everything you enter stays in this browser.</p>
         <p>
           Based on <a className="underline" href="https://github.com/bryanbraun/your-life">Your Life</a> by Bryan

@@ -8,13 +8,13 @@ export function Legend({ eras, moments, goals, colours, chances }: Props) {
   const item = 'flex items-center gap-1.5'
   const swatch = 'inline-block size-3 rounded-[2px] border'
   return (
-    <ul aria-label="Key" className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-soft" data-testid="legend">
+    <ul aria-label="Key" className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-soft" data-testid="legend" data-print-part>
       <li className={item}>
         <span aria-hidden className={`${swatch} border-accent bg-accent`} />
         Lived
       </li>
       <li className={item}>
-        <span aria-hidden className={`${swatch} border-today bg-today`} />
+        <span aria-hidden className={`${swatch} border-today bg-today ring-1 ring-ink ring-offset-1 ring-offset-paper`} />
         Now
       </li>
       {used.map((category) => (
