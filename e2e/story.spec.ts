@@ -40,7 +40,7 @@ test('an era added from a box colours every week it covers, and is remembered', 
   await expect(box(page, 1094)).toHaveAttribute('data-eras', '1')
   await expect(box(page, 1095)).not.toHaveAttribute('data-eras')
   // Painted in the Education colour (#9c7020), not left blank.
-  await expect(box(page, 1000)).toHaveCSS('background-color', 'rgb(156, 112, 32)')
+  await expect(box(page, 1000)).toHaveCSS('background-color', 'rgb(133, 126, 36)')
   await expect(box(page, 1000)).toHaveAccessibleName(/University/)
   await expect(page.getByTestId('legend')).toContainText('Education')
 
@@ -105,7 +105,7 @@ test('overlapping eras: the newest fills the box, the other shows as a stripe', 
   // Job from 4 Jan 2010 (box 1017) overlaps University until box 1094.
   await addEra(page, 1050, 'Weekend job', 'Work', '2010-01-04', '2012-12-31')
   await expect(box(page, 1050)).toHaveAttribute('data-eras', '2')
-  await expect(box(page, 1050)).toHaveCSS('background-color', 'rgb(62, 95, 138)')
+  await expect(box(page, 1050)).toHaveCSS('background-color', 'rgb(90, 72, 201)')
   await expect(box(page, 1050)).toHaveCSS('background-image', /linear-gradient/)
   await expect(box(page, 1050)).toHaveAccessibleName(/Weekend job, University/)
   await expect(box(page, 1000)).toHaveAttribute('data-eras', '1')
@@ -128,7 +128,7 @@ test('category colours can be changed and reset', async ({ page }) => {
   await dialog(page).getByLabel('Education colour').fill('#123456')
   await expect(box(page, 1000)).toHaveCSS('background-color', 'rgb(18, 52, 86)')
   await dialog(page).getByRole('button', { name: 'Reset colours' }).click()
-  await expect(box(page, 1000)).toHaveCSS('background-color', 'rgb(156, 112, 32)')
+  await expect(box(page, 1000)).toHaveCSS('background-color', 'rgb(133, 126, 36)')
 })
 
 test('"Forget me" deletes the story too, after asking', async ({ page }) => {

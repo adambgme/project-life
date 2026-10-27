@@ -57,6 +57,7 @@ export function YourDetails(props: Props) {
     ...(hidden ? [] : [SEX_NAMES[profile.sex].replace(', averaged', ' sexes'), NATION_NAMES[profile.nation], profile.basis === 'cohort' ? 'projected rates' : "this year's rates"]),
     `${gridYears}-year grid`,
     STATISTICS_NAMES[profile.statistics],
+    ...(profile.patterns ? ['patterns on eras'] : []),
   ]
 
   return (
@@ -215,6 +216,23 @@ export function YourDetails(props: Props) {
           ))}
         </div>
       </fieldset>
+
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={profile.patterns}
+          onChange={(e) => set({ patterns: e.target.checked })}
+          className="mt-1 accent-accent"
+          aria-describedby={`${id}-patterns-note`}
+        />
+        <span>
+          Patterns on eras
+          <span id={`${id}-patterns-note`} className="block text-xs text-ink-soft">
+            Each kind of era gets its own texture as well as its colour: easier to tell apart for colour-blind eyes and
+            on a black-and-white print.
+          </span>
+        </span>
+      </label>
 
       {profile.statistics === 'hidden' ? (
         <p className="text-base" data-testid="life-expectancy">

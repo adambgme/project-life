@@ -143,7 +143,7 @@ export function App() {
         ink: css('ink'),
         inkSoft: css('ink-soft'),
         rule: css('rule'),
-        lived: css('accent'),
+        lived: css('ink'),
         today: css('today'),
         accent: css('accent'),
         category: (category) => resolveColour(categoryColour(category, colours)),
@@ -286,10 +286,11 @@ export function App() {
             goals={goalsById}
             colourOf={colourOf}
             chances={chances}
+            patterns={!isExample && profile.patterns}
             onOpenBox={openBox}
           />
         </div>
-        <Legend eras={shown.eras} moments={shown.moments} goals={shown.goals} colours={colours} chances={!!chances} />
+        <Legend eras={shown.eras} moments={shown.moments} goals={shown.goals} colours={colours} chances={!!chances} patterns={!isExample && profile.patterns} />
         {profile.statistics !== 'hidden' && <Figures profile={profile} today={today} isExample={isExample} />}
         </>
         )}

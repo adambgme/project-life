@@ -1,7 +1,7 @@
 import { memo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { BOXES_PER_YEAR, boxIndex, boxRange, type CalendarDate, type View } from '../life/lifeMaths'
 import { chanceWords, type GridChances } from '../life/gridChances'
-import { countdown, goalDate, weeksToGo, type BoxStory, type Category, type Era, type Goal, type Moment } from '../life/story'
+import { categoryPattern, countdown, goalDate, weeksToGo, type BoxStory, type Category, type Era, type Goal, type Moment } from '../life/story'
 
 type Props = {
   view: View
@@ -17,6 +17,8 @@ type Props = {
   colourOf: (entry: { category: Category }) => string
   /** The statistics overlay, when shown. */
   chances?: GridChances
+  /** Texture each era by its category, so eras don't rely on colour alone. */
+  patterns?: boolean
   /** Open a box (click, tap or Enter); absent when the grid is read-only. */
   onOpenBox?: (index: number) => void
 }
@@ -68,10 +70,16 @@ const LAYOUTS: Record<View, Layout> = {
 const formatDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 const show = ({ year, month, day }: CalendarDate) => formatDate.format(new Date(Date.UTC(year, month - 1, day)))
 
-function cellLabel(view: View, index: number, birthDate: CalendarDate | null, todayIndex: number): string {
+const UNIT_NAMES: Record<View, string> = { weeks: 'Week', months: 'Month', years: 'Year' }
+
+/** "Week 1,891 of 5,200. Age 36, week 20: 26 Oct 2026 to 1 Nov 2026, this week": where the box sits in the whole
+ * life first (left out with `total` null, for the short visible line), then the age and dates. */
+function cellLabel(view: View, index: number, total: number | null, birthDate: CalendarDate | null, todayIndex: number): string {
   const perYear = BOXES_PER_YEAR[view]
   const age = Math.floor(index / perYear)
-  let label = view === 'years' ? `Age ${age}` : `Age ${age}, ${view === 'weeks' ? 'week' : 'month'} ${(index % perYear) + 1}`
+  // In years the age already says it ("Age 36" is year 37), so only weeks and months give a position.
+  const position = total === null || view === 'years' ? '' : `${UNIT_NAMES[view]} ${(index + 1).toLocaleString('en-GB')} of ${total.toLocaleString('en-GB')}. `
+  let label = position + (view === 'years' ? `Age ${age}` : `Age ${age}, ${view === 'weeks' ? 'week' : 'month'} ${(index % perYear) + 1}`)
   if (!birthDate) return label
   const { start, end } = boxRange(view, birthDate, index)
   label += `: ${show(start)} to ${show(end)}`
@@ -116,7 +124,7 @@ function storyLabel(box: BoxStory | undefined, { eras, moments, goals, birth, to
     })
     parts.push(`${box.goals.length === 1 ? 'goal' : 'goals'}: ${named.join(', ')}`)
   }
-  if (box.eras.length) parts.push(box.eras.map((id) => eras.get(id)?.label).join(', '))
+  if (box.eras.length) parts.push(`${box.eras.length === 1 ? 'era' : 'eras'}: ${box.eras.map((id) => eras.get(id)?.label).join(', ')}`)
   if (box.moments.length) {
     const names = box.moments.map((id) => moments.get(id)?.label).join(', ')
     parts.push(`${box.moments.length === 1 ? 'moment' : 'moments'}: ${names}`)
@@ -130,6 +138,7 @@ function storyStyle(
   state: string,
   { eras, goals }: Lookup,
   colourOf: Props['colourOf'],
+  patterns: boolean,
 ): CSSProperties | undefined {
   if (!box) return undefined
   // A goal outlines its box in the goal's colour, over any fill (but never hides this week's marker).
@@ -139,17 +148,21 @@ function storyStyle(
   const [top, ...others] = box.eras.map((id) => colourOf(eras.get(id)!))
   const fill = state === 'ahead' ? `color-mix(in srgb, ${top} 35%, transparent)` : top
   const stripes = others.slice(0, 2).map((c, i) => `${c} ${i * 25}% ${(i + 1) * 25}%`)
+  const layers = [
+    patterns ? categoryPattern(eras.get(box.eras[0]!)!.category, state === 'ahead' ? top : undefined) : undefined,
+    stripes.length ? `linear-gradient(to top, ${stripes.join(', ')}, transparent ${stripes.length * 25}%)` : undefined,
+  ].filter(Boolean)
   return {
     backgroundColor: fill,
     borderColor: top,
     ...outline,
-    backgroundImage: stripes.length ? `linear-gradient(to top, ${stripes.join(', ')}, transparent ${stripes.length * 25}%)` : undefined,
+    backgroundImage: layers.length ? layers.join(', ') : undefined,
   }
 }
 
 /** The life grid for one view: a keyboard-navigable ARIA grid with one tab stop (ADR 0001). */
 export const LifeGrid = memo(function LifeGrid(props: Props) {
-  const { view, birthDate, today, years, story, eras, moments, goals, colourOf, chances, onOpenBox } = props
+  const { view, birthDate, today, years, story, eras, moments, goals, colourOf, chances, patterns = false, onOpenBox } = props
   const lookup: Lookup = { eras, moments, goals, birth: birthDate, today }
   const layout = LAYOUTS[view]
   const perYear = BOXES_PER_YEAR[view]
@@ -194,12 +207,14 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
     moveTo(target)
   }
 
-  const label =
+  const shape =
     view === 'weeks'
       ? 'Your life in weeks: one row per year of age, 52 weeks per row'
       : view === 'months'
         ? 'Your life in months: three years per row'
         : 'Your life in years: ten years per row'
+  const lived = Math.max(0, Math.min(todayIndex, total))
+  const label = birthDate ? `${shape}. ${lived.toLocaleString('en-GB')} of ${total.toLocaleString('en-GB')} ${view} lived.` : shape
 
   return (
     <figure className={`flex w-full flex-col gap-2 ${layout.maxWidth} print:max-w-(--print-grid-width)`} data-testid="grid-figure">
@@ -228,7 +243,7 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
       <p aria-hidden className="min-h-5 truncate text-xs text-ink-soft print:hidden" data-testid="box-details">
         {detailIndex !== null &&
           [
-            cellLabel(view, detailIndex, birthDate, todayIndex),
+            cellLabel(view, detailIndex, null, birthDate, todayIndex),
             chanceLabel(detailIndex, chances, todayIndex),
             storyLabel(story.get(detailIndex), lookup),
           ]
@@ -270,7 +285,7 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
                   const state = index === todayIndex ? 'today' : index < todayIndex ? 'lived' : 'ahead'
                   const box = story.get(index)
                   const about = [chanceLabel(index, chances, todayIndex), storyLabel(box, lookup)].filter(Boolean).join('. ')
-                  const storyLook = storyStyle(box, state, lookup, colourOf)
+                  const storyLook = storyStyle(box, state, lookup, colourOf, patterns)
                   // The chances overlay sits under any era or goal styling, so its marks stay visible.
                   const chanceLook = chances && state === 'ahead' ? chanceStyle(index, chances) : undefined
                   const look = chanceLook || storyLook ? { ...chanceLook, ...storyLook } : undefined
@@ -282,7 +297,7 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
                       data-index={index}
                       data-state={state}
                       tabIndex={index === activeIndex ? 0 : -1}
-                      aria-label={cellLabel(view, index, birthDate, todayIndex) + (about ? `. ${about}` : '')}
+                      aria-label={cellLabel(view, index, total, birthDate, todayIndex) + (about ? `. ${about}` : '')}
                       data-eras={box?.eras.length || undefined}
                       data-moments={box?.moments.length || undefined}
                       data-goals={box?.goals.length || undefined}
@@ -301,9 +316,9 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
                           : '') +
                         (view === 'years' ? 'rounded-[3px] ' : 'rounded-[1px] ') +
                         (state === 'lived'
-                          ? 'border-accent bg-accent'
+                          ? 'border-ink bg-ink'
                           : state === 'today'
-                            ? 'border-today bg-today ring-2 ring-ink ring-offset-1 ring-offset-paper'
+                            ? 'border-today bg-today ring-2 ring-ink ring-offset-2 ring-offset-paper'
                             : 'border-rule bg-transparent')
                       }
                     />

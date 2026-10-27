@@ -7,6 +7,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
+  // Locally, one browser at a time: several Chromium workers use about 4 GB, more than the dev machine can spare.
+  workers: process.env.CI ? undefined : 1,
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
   use: {
     baseURL: `http://localhost:${port}/project-life/`,
