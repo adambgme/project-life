@@ -31,7 +31,19 @@ test('the chances overlay is off by default, and one choice turns it on and off'
   await expect(page.locator('[data-chance]')).toHaveCount(0)
 })
 
+test('a bar shows how much of an average lifetime is lived, and the years to go', async ({ page }) => {
+  const bar = page.getByRole('progressbar', { name: 'Share of an average lifetime lived' })
+  const percent = Number(await bar.getAttribute('aria-valuenow'))
+  // 36.4 years of an average of about 86-88 for men and women averaged born in 1990.
+  expect(percent).toBeGreaterThanOrEqual(40)
+  expect(percent).toBeLessThanOrEqual(44)
+  await expect(page.getByTestId('life-bar')).toContainText(
+    new RegExp(`That's about ${percent}% of an average lifetime for people like you: around 5\\d years to go, to about 20[78]\\d\\.`),
+  )
+})
+
 test('hiding statistics removes every figure and stays hidden', async ({ page }) => {
+  await expect(page.getByTestId('life-bar')).toBeVisible()
   await page.getByRole('radio', { name: 'Show my chances on the grid' }).check()
   await page.getByRole('radio', { name: 'Hide all statistics' }).check()
   const text = page.getByTestId('life-expectancy')
@@ -39,6 +51,7 @@ test('hiding statistics removes every figure and stays hidden', async ({ page })
   await expect(text).toHaveText(
     "The grid runs to 90 years. Statistics are hidden, so it isn't sized from them; turn them back on above whenever you like.",
   )
+  await expect(page.getByTestId('life-bar')).toHaveCount(0)
   await expect(page.locator('[role="gridcell"]')).toHaveCount(90 * 52)
   await expect(page.locator('[data-chance]')).toHaveCount(0)
   for (const control of [page.getByRole('radio', { name: 'Projected (cohort)' }), page.getByLabel('Life tables for'), page.getByLabel('Where you live')]) {
