@@ -36,3 +36,14 @@ colour: lines at four angles, a crosshatch and rings, with Other left plain. It 
 readers and on black-and-white prints. It is off by default so the grid stays calm, and is saved with the profile.
 
 People can still choose their own category colours. Those are theirs, and the patterns still work over them.
+
+**Around the grid.**
+- **Focus:** a focused box gets an ink outline with a paper band inside it, so the ring shows against ink, paper or any
+  era.
+- **This week:** its ring has a wider paper gap, so it stays clear of the inked weeks next to it.
+- **Forced colours:** in forced-colours mode (Windows high contrast), the grid and key keep their own colours, because
+  stripping the fills would make lived, this week, eras and the future identical.
+- **Future eras:** patterns on eras still ahead are drawn in the era's own colour, since paper lines vanish on their
+  pale wash.
+
+**Not yet covered.** The share image (canvas) draws neither patterns nor goal and moment entries in its key.

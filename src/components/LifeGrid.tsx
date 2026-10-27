@@ -77,7 +77,8 @@ const UNIT_NAMES: Record<View, string> = { weeks: 'Week', months: 'Month', years
 function cellLabel(view: View, index: number, total: number | null, birthDate: CalendarDate | null, todayIndex: number): string {
   const perYear = BOXES_PER_YEAR[view]
   const age = Math.floor(index / perYear)
-  const position = total === null ? '' : `${UNIT_NAMES[view]} ${(index + 1).toLocaleString('en-GB')} of ${total.toLocaleString('en-GB')}. `
+  // In years the age already says it ("Age 36" is year 37), so only weeks and months give a position.
+  const position = total === null || view === 'years' ? '' : `${UNIT_NAMES[view]} ${(index + 1).toLocaleString('en-GB')} of ${total.toLocaleString('en-GB')}. `
   let label = position + (view === 'years' ? `Age ${age}` : `Age ${age}, ${view === 'weeks' ? 'week' : 'month'} ${(index % perYear) + 1}`)
   if (!birthDate) return label
   const { start, end } = boxRange(view, birthDate, index)
@@ -148,7 +149,7 @@ function storyStyle(
   const fill = state === 'ahead' ? `color-mix(in srgb, ${top} 35%, transparent)` : top
   const stripes = others.slice(0, 2).map((c, i) => `${c} ${i * 25}% ${(i + 1) * 25}%`)
   const layers = [
-    patterns ? categoryPattern(eras.get(box.eras[0]!)!.category) : undefined,
+    patterns ? categoryPattern(eras.get(box.eras[0]!)!.category, state === 'ahead' ? top : undefined) : undefined,
     stripes.length ? `linear-gradient(to top, ${stripes.join(', ')}, transparent ${stripes.length * 25}%)` : undefined,
   ].filter(Boolean)
   return {
@@ -317,7 +318,7 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
                         (state === 'lived'
                           ? 'border-ink bg-ink'
                           : state === 'today'
-                            ? 'border-today bg-today ring-2 ring-ink ring-offset-1 ring-offset-paper'
+                            ? 'border-today bg-today ring-2 ring-ink ring-offset-2 ring-offset-paper'
                             : 'border-rule bg-transparent')
                       }
                     />

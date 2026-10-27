@@ -31,7 +31,8 @@ export function Legend({ eras, moments, goals, colours, chances, patterns }: Pro
             className={swatch}
             style={{
               backgroundColor: categoryColour(category, colours),
-              backgroundImage: patterns ? categoryPattern(category) : undefined,
+              // Only eras are textured on the grid, so only their categories are in the key.
+              backgroundImage: patterns && eras.some((e) => e.category === category) ? categoryPattern(category) : undefined,
               borderColor: categoryColour(category, colours),
             }}
           />

@@ -18,13 +18,13 @@ export const CATEGORY_NAMES: Record<Category, string> = {
 
 /** Light-theme defaults as hex, for colour pickers (the page itself uses the theme's CSS variables). */
 export const DEFAULT_COLOURS: Record<Category, string> = {
-  home: '#b85c38',
-  work: '#3e5f8a',
-  education: '#9c7020',
-  relationships: '#a9466a',
-  travel: '#2f7f7c',
-  health: '#6f4a8e',
-  other: '#6e675e',
+  home: '#993b01',
+  work: '#5a48c9',
+  education: '#857e24',
+  relationships: '#97238c',
+  travel: '#139bab',
+  health: '#3cc376',
+  other: '#c0bab4',
 }
 
 /** CSS colour for a category: the person's choice, or the theme's default. */
@@ -32,22 +32,25 @@ export function categoryColour(category: Category, chosen: Partial<Record<Catego
   return chosen[category] ?? `var(--color-cat-${category})`
 }
 
-/** A texture for each category (the "Patterns on eras" setting), drawn in the paper colour over an era's fill, so
- * eras can be told apart without colour: lines at four angles, a crosshatch and rings. Other stays plain. */
-const STROKE = 'color-mix(in srgb, var(--color-paper) 75%, transparent)'
-const lines = (angle: number) => `repeating-linear-gradient(${angle}deg, ${STROKE} 0 1px, transparent 1px 4px)`
-const PATTERNS: Record<Category, string | undefined> = {
-  home: lines(45),
-  work: lines(-45),
-  education: lines(0),
-  relationships: `${lines(45)}, ${lines(-45)}`,
-  travel: lines(90),
-  health: `repeating-radial-gradient(circle, ${STROKE} 0 1px, transparent 1px 3px)`,
+/** A texture for each category (the "Patterns on eras" setting), so eras can be told apart without colour: lines at
+ * four angles, a crosshatch and rings. Other stays plain. Drawn in the paper colour over a solid fill; over the pale
+ * wash of an era still ahead, pass the era's own colour instead so the lines show. */
+const PAPER_STROKE = 'color-mix(in srgb, var(--color-paper) 75%, transparent)'
+const PATTERNS: Record<Category, ((stroke: string) => string) | undefined> = {
+  home: (s) => lines(45, s),
+  work: (s) => lines(-45, s),
+  education: (s) => lines(0, s),
+  relationships: (s) => `${lines(45, s)}, ${lines(-45, s)}`,
+  travel: (s) => lines(90, s),
+  health: (s) => `repeating-radial-gradient(circle, ${s} 0 1px, transparent 1px 3px)`,
   other: undefined,
 }
+function lines(angle: number, stroke: string) {
+  return `repeating-linear-gradient(${angle}deg, ${stroke} 0 1px, transparent 1px 4px)`
+}
 
-export function categoryPattern(category: Category): string | undefined {
-  return PATTERNS[category]
+export function categoryPattern(category: Category, stroke = PAPER_STROKE): string | undefined {
+  return PATTERNS[category]?.(stroke)
 }
 
 /** A period of life. `end: null` means it's still going on (it runs to today). */

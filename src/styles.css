@@ -70,6 +70,25 @@ body {
   outline-offset: 2px;
 }
 
+/* In the grid the ring sits over the neighbouring boxes, which may be ink: a paper band inside an ink outline shows
+   against any of them. (Important only to beat a goal's inline outline while focused.) */
+[role='gridcell']:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--color-paper) !important;
+}
+
+/* Windows high-contrast and other forced colours would strip every fill from the grid and its key, leaving lived,
+   this week, eras and the future identical: keep their own colours there. */
+@media (forced-colors: active) {
+  [role='gridcell'],
+  [data-testid='legend'] span {
+    forced-color-adjust: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -83,7 +102,7 @@ body {
 @media print {
   /* Always the light theme on paper, even when the screen is dark. */
   :root {
-    --color-paper: #f5efe3;
+    --color-paper: #ffffff;
     --color-paper-deep: #ebe3d3;
     --color-ink: #2a2520;
     --color-ink-soft: #5c5348;

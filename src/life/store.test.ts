@@ -19,7 +19,7 @@ describe('patterns on eras', () => {
   })
 
   it('differ for every category but Other, which stays plain', () => {
-    const patterns = CATEGORIES.map(categoryPattern)
+    const patterns = CATEGORIES.map((c) => categoryPattern(c))
     expect(categoryPattern('other')).toBeUndefined()
     const used = patterns.filter(Boolean)
     expect(used).toHaveLength(CATEGORIES.length - 1)

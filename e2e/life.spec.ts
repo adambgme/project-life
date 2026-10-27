@@ -181,7 +181,7 @@ test('years, months and weeks views, each with today marked, remembered in the a
   await page.getByRole('radio', { name: 'Years' }).check({ force: true })
   await expect(page).toHaveURL(/\?view=years$/)
   await expect(page.locator('[data-state="lived"]')).toHaveCount(36)
-  await expect(page.locator('[data-state="today"]')).toHaveAccessibleName('Year 37 of 100. Age 36: 15 Jun 2026 to 14 Jun 2027, this year')
+  await expect(page.locator('[data-state="today"]')).toHaveAccessibleName('Age 36: 15 Jun 2026 to 14 Jun 2027, this year')
 
   await page.getByRole('radio', { name: 'Weeks' }).check({ force: true })
   await expect(page).toHaveURL(/\/project-life\/$/)
