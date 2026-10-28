@@ -23,7 +23,7 @@ export function LifeBar({ progress, who, source }: Props) {
         aria-valuetext={`${percent}%`}
         className="h-3 w-full max-w-xl overflow-hidden rounded-[4px] bg-rule/50 print:border print:border-rule"
       >
-        <div className="h-full rounded-r-[4px] bg-ink" style={{ width: `${percent}%` }} />
+        <div className="h-full origin-left rounded-r-[4px] bg-ink" style={{ width: `${percent}%` }} data-fill />
       </div>
       <p className="text-xs text-ink-soft">An average for a large group of people, not a forecast for anyone. {source}</p>
     </div>

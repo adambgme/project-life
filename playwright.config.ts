@@ -19,6 +19,10 @@ export default defineConfig({
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
     { name: 'phone', use: { ...devices['Pixel 7'] } },
+    // The motion checks in the other engines: Safari has scroll-driven animations, Firefox (so far) shows the page still.
+    // WebKit needs system libraries the CI image has, so it runs there only.
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] }, testMatch: 'motion.spec.ts' },
+    ...(process.env.CI ? [{ name: 'webkit', use: { ...devices['iPhone 15'] }, testMatch: 'motion.spec.ts' }] : []),
   ],
   webServer: {
     command: 'npm run build && npm run preview',

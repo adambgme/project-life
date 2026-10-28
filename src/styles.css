@@ -98,6 +98,43 @@ body {
   }
 }
 
+/* Motion (docs/adr/0005-motion.md). Every element's own style is its finished, readable state: animations only play
+   from it, on screens, for people who haven't asked for less motion. Scroll-linked ones also need scroll-driven
+   animations; browsers without them show the page still. Calm and slow: this page is about lifetimes. */
+:root {
+  --ease-calm: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: 0 12px;
+  }
+}
+@keyframes fill {
+  from {
+    scale: 0 1;
+  }
+}
+@media screen and (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) and (animation-range: entry 0% entry 40%) {
+    /* A chapter of the figures rises into place over its first 160px on screen, whatever its height. (The timeline
+       comes after the shorthand, which would reset it.) */
+    [data-reveal] {
+      animation: rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0px entry 160px;
+    }
+  }
+  /* The life bar fills to its share as the page opens. */
+  [data-testid='life-bar'] [data-fill] {
+    animation: fill 900ms var(--ease-calm) 150ms both;
+  }
+  /* Switching weeks, months and years fades the new grid in. */
+  [data-grid-frame] {
+    animation: rise 350ms var(--ease-calm) both;
+  }
+}
+
 /* Printing: one page (the poster's width is set just before printing), colours kept, white paper. */
 @media print {
   /* Always the light theme on paper, even when the screen is dark. */
