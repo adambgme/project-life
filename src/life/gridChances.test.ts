@@ -3,7 +3,7 @@ import uk from '../data/mortality/uk.json'
 import { boxIndex } from './lifeMaths'
 import { chanceOfReaching, outlook } from './mortality'
 import { decodeMortality, type EncodedMortalityData } from './mortalityData'
-import { boxChances, chanceWords } from './gridChances'
+import { boxChances, chanceWords, halfBox } from './gridChances'
 
 const data = decodeMortality(uk as EncodedMortalityData)
 const birth = { year: 1990, month: 6, day: 15 }
@@ -38,6 +38,16 @@ describe('boxChances: the chance of being alive at each box', () => {
     expect(chances.principal[chances.half - 1]!).toBeGreaterThanOrEqual(0.5)
     expect(chances.principal[chances.tenth]!).toBeLessThan(0.1)
     expect(chances.principal[chances.tenth - 1]!).toBeGreaterThanOrEqual(0.1)
+  })
+})
+
+describe('halfBox: the 1-in-2 mark on its own', () => {
+  it('is the same box the full chances mark', () => {
+    expect(halfBox('weeks', birth, today, 100, o('principal'))).toBe(chances.half)
+  })
+
+  it("is off the grid when the grid ends first", () => {
+    expect(halfBox('weeks', birth, today, 60, o('principal'))).toBe(-1)
   })
 })
 

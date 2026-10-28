@@ -42,9 +42,29 @@ test('with reduced motion nothing moves, and everything is shown without scrolli
   await page.goto('./')
   for (const chapter of await page.locator('[data-reveal]').all()) await expect(chapter).toHaveCSS('opacity', '1')
   await expect(page.getByTestId('life-bar').locator('[data-fill]')).toHaveCSS('scale', /^(none|1)$/)
+  expect(await veilScale(page)).toBe('none')
   await page.getByRole('radio', { name: 'Years' }).check({ force: true })
   await expect(page.getByTestId('summary')).toContainText('years')
   expect(await page.evaluate(() => document.getAnimations().length)).toBe(0)
+})
+
+const veilScale = (page: Page) =>
+  page.locator('[data-grid-frame]').evaluate((el) => {
+    const after = getComputedStyle(el, '::after')
+    return after.content === 'none' ? 'none' : after.scale
+  })
+
+test('the grid inks in as the page opens, and ends fully shown', async ({ page }) => {
+  await page.goto('./')
+  const frame = page.locator('[data-grid-frame]')
+  await expect(frame).toHaveAttribute('data-ink-in', 'true')
+  // The veil has lifted completely, and this week and the 1-in-2 mark are in place.
+  await expect.poll(() => veilScale(page)).toBe('1 0')
+  await expect(page.locator('[data-state="today"]')).toHaveCSS('opacity', '1')
+  await expect(page.locator('[data-half]')).toHaveCSS('opacity', '1')
+  // Switching views doesn't ink in again; the new grid just fades in.
+  await page.getByRole('radio', { name: 'Months' }).check({ force: true })
+  await expect(frame).not.toHaveAttribute('data-ink-in')
 })
 
 test('a new view fades in, and quick changes all land', async ({ page }) => {
@@ -59,6 +79,7 @@ test('a new view fades in, and quick changes all land', async ({ page }) => {
 test('printing plays no motion', async ({ page }) => {
   await page.emulateMedia({ media: 'print' })
   await page.goto('./')
+  expect(await veilScale(page)).toBe('none')
   await expect(page.getByTestId('life-bar').locator('[data-fill]')).toHaveCSS('scale', /^(none|1)$/)
   expect(await page.evaluate(() => document.getAnimations().length)).toBe(0)
 })

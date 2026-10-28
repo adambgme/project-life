@@ -6,11 +6,13 @@ type Props = {
   goals: Goal[]
   colours: Partial<Record<Category, string>>
   chances?: boolean
+  /** The 1-in-2 mark alone (without the chances). */
+  half?: boolean
   patterns?: boolean
 }
 
 /** What the colours and marks on the grid mean: the categories in use, plus lived, this week and moments. */
-export function Legend({ eras, moments, goals, colours, chances, patterns }: Props) {
+export function Legend({ eras, moments, goals, colours, chances, half, patterns }: Props) {
   const used = CATEGORIES.filter((c) => [...eras, ...moments, ...goals].some((entry) => entry.category === c))
   const item = 'flex items-center gap-1.5'
   const swatch = 'inline-block size-3 rounded-[2px] border'
@@ -55,6 +57,12 @@ export function Legend({ eras, moments, goals, colours, chances, patterns }: Pro
         <span aria-hidden className={`${swatch} border-rule`} />
         Ahead
       </li>
+      {half && !chances && (
+        <li className={item}>
+          <span aria-hidden className={`${swatch} border-rule outline outline-1 outline-offset-1 outline-ink`} />
+          Where 1 in 2 people like you are still alive
+        </li>
+      )}
       {chances && (
         <>
           <li className={item}>

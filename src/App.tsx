@@ -15,7 +15,7 @@ import { CLASSIC_GRID_YEARS, emptyLife, MIN_GRID_YEARS, NATION_NAMES, newProfile
 import { categoryColour, countdown, goalDate, layoutStory, weeksToGo, type Category } from './life/story'
 import { useLife } from './life/useLife'
 import { useMortality } from './life/useMortality'
-import { boxChances } from './life/gridChances'
+import { boxChances, halfBox } from './life/gridChances'
 import { exportFile, readLinkFragment } from './life/transfer'
 import { readPage, readView, writeView } from './life/viewParam'
 import { Figures } from './explore/Figures'
@@ -99,6 +99,12 @@ export function App() {
     const variant = (v: 'low' | 'high') => outlook(mortality, birthDate, today, { sex: profile.sex, basis: profile.basis, variant: v })
     return boxChances(view, birthDate, today, gridYears, { principal: personal, low: variant('low'), high: variant('high') })
   }, [showChances, mortality, birthDate, today, profile.sex, profile.basis, view, gridYears, personal])
+  // Without the full chances, the grid still marks where fewer than half of people like you are still alive, so the
+  // grid and the life bar tell the same story.
+  const half = useMemo(
+    () => (showChances || profile.statistics === 'hidden' ? -1 : halfBox(view, birthDate, today, gridYears, personal)),
+    [showChances, profile.statistics, view, birthDate, today, gridYears, personal],
+  )
   const story = useMemo(
     () => layoutStory(view, birthDate, today, shown.eras, shown.moments, shown.goals),
     [view, birthDate, today, shown.eras, shown.moments, shown.goals],
@@ -131,7 +137,12 @@ export function App() {
     return true
   }
 
+  // The grid inks in when the page opens and when the birth date changes; switching views just fades the new one in.
+  const frameKey = `${view}|${birthDate.year}-${birthDate.month}-${birthDate.day}`
+  const [quietFrame, setQuietFrame] = useState<string | null>(null)
+
   function changeView(next: View) {
+    setQuietFrame(`${next}|${birthDate.year}-${birthDate.month}-${birthDate.day}`)
     setView(next)
     writeView(next)
   }
@@ -344,7 +355,8 @@ export function App() {
         {/* A new view fades in rather than jumping (styles.css). */}
         </div>
         <div className="flex flex-col gap-6 print:gap-3">
-        <div key={view} className="flex justify-center" data-grid-frame>
+        {/* Motion (styles.css): the grid inks in, or a new view fades in rather than jumping. */}
+        <div key={frameKey} className="relative flex justify-center" data-grid-frame data-ink-in={frameKey !== quietFrame || undefined}>
           <LifeGrid
             view={view}
             birthDate={birthDate}
@@ -356,11 +368,12 @@ export function App() {
             goals={goalsById}
             colourOf={colourOf}
             chances={chances}
+            half={half}
             patterns={!isExample && profile.patterns}
             onOpenBox={openBox}
           />
         </div>
-        <Legend eras={shown.eras} moments={shown.moments} goals={shown.goals} colours={colours} chances={!!chances} patterns={!isExample && profile.patterns} />
+        <Legend eras={shown.eras} moments={shown.moments} goals={shown.goals} colours={colours} chances={!!chances} half={half >= 0} patterns={!isExample && profile.patterns} />
         </div>
         </div>
         {profile.statistics !== 'hidden' && <Figures profile={profile} today={today} isExample={isExample} />}

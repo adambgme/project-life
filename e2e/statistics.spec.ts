@@ -44,6 +44,29 @@ test('a bar shows how much of an average lifetime is lived, and the years to go'
   )
 })
 
+test('without the chances, the grid still marks where half of people like you are still alive', async ({ page }) => {
+  await expect(page.getByRole('radio', { name: 'Just the numbers' })).toBeChecked()
+  const half = page.locator('[data-half]')
+  await expect(half).toHaveCount(1)
+  await expect(half).toHaveAccessibleName(/about half of people like you live beyond here$/)
+  await expect(half).toHaveCSS('outline-style', 'solid')
+  await expect(page.getByTestId('chance-mark')).toHaveText('1 in 2')
+  await expect(page.getByTestId('legend')).toContainText('Where 1 in 2 people like you are still alive')
+  // It sits near the age half of people like you reach: between 80 and 95.
+  const index = Number(await half.getAttribute('data-index'))
+  expect(index / 52).toBeGreaterThan(80)
+  expect(index / 52).toBeLessThan(95)
+
+  // The full chances keep the same mark (and add the 1-in-10).
+  await page.getByRole('radio', { name: 'Show my chances on the grid' }).check()
+  await expect(half).toHaveAttribute('data-index', String(index))
+  await expect(page.getByTestId('chance-mark')).toHaveText(['1 in 2', '1 in 10'])
+
+  await page.getByRole('radio', { name: 'Hide all statistics' }).check()
+  await expect(half).toHaveCount(0)
+  await expect(page.getByTestId('chance-mark')).toHaveCount(0)
+})
+
 test('hiding statistics removes every figure and stays hidden', async ({ page }) => {
   await expect(page.getByTestId('life-bar')).toBeVisible()
   await page.getByRole('radio', { name: 'Show my chances on the grid' }).check()
