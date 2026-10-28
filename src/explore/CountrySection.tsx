@@ -9,13 +9,11 @@ import { LineChart, type Point } from './LineChart'
 const UK_CODE = 'gbr'
 const percent = (p: number) => `${Math.round(p * 100)}%`
 
-type Props = { birthDate: CalendarDate; today: CalendarDate; options: OutlookOptions; who: string }
 type Load = MortalityData | 'loading' | 'failed'
 
-/** "If you lived in…": the outlook for people like you living in another country, beside the UK's, both on the UN's
- * figures so that like is compared with like. A country's tables load from this site only once it's picked. */
-export function CountrySection({ birthDate, today, options, who }: Props) {
-  const [chosen, setChosen] = useState('')
+/** The UK and a chosen country (ISO alpha-3, '' for none), both on the UN's figures so that like is compared with like.
+ * A country's tables load from this site only once it's picked. */
+export function useCountryCompare(chosen: string, birthDate: CalendarDate, today: CalendarDate, options: OutlookOptions) {
   const [tables, setTables] = useState<Record<string, Load>>({})
   const columns = chosen === '' ? [] : chosen === UK_CODE ? [UK_CODE] : [UK_CODE, chosen]
   useEffect(() => {
@@ -35,35 +33,50 @@ export function CountrySection({ birthDate, today, options, who }: Props) {
     () => (ready ? loaded.map((data) => outlook(data, birthDate, today, options)) : []),
     [ready, chosen, tables, birthDate, today, options.sex, options.basis],
   )
-  const from = outlooks[0]?.fromAge ?? 0
-  const reach = [70, 80, 90].filter((age) => age > from)
-  const lastAge = Math.max(105, from + 10)
-  const curve = (i: number): Point[] =>
-    Array.from({ length: lastAge - from + 1 }, (_, k) => ({ x: from + k, y: chanceOfReaching(outlooks[i]!, from + k) }))
-  const source = loaded[0]?.source
   const names = columns.map((code) => countryName(code)!)
 
   function retry() {
     setTables((t) => Object.fromEntries(Object.entries(t).filter(([, load]) => load !== 'failed')))
   }
 
+  return { chosen, columns, loaded, ready, failed, outlooks, names, retry }
+}
+
+export type CountryCompare = ReturnType<typeof useCountryCompare>
+
+/** The country picker: every country in the UN's tables. */
+export function CountryPicker({ chosen, onChoose }: { chosen: string; onChoose: (code: string) => void }) {
+  return (
+    <label className="flex flex-col gap-1 text-sm text-ink-soft">
+      Country of residence
+      <select
+        className="max-w-full rounded-sm border border-rule bg-paper px-2 py-1.5 text-base text-ink"
+        value={chosen}
+        onChange={(e) => onChoose(e.target.value)}
+      >
+        <option value="">Choose a country</option>
+        {COUNTRIES.map((c) => (
+          <option key={c.code} value={c.code}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+/** "If you lived in…": the survival curves and a table for people like you living in the UK and in the chosen country. */
+export function CountrySection({ compare, today, options, who }: { compare: CountryCompare; today: CalendarDate; options: OutlookOptions; who: string }) {
+  const { chosen, columns, loaded, ready, failed, outlooks, names, retry } = compare
+  const from = outlooks[0]?.fromAge ?? 0
+  const reach = [70, 80, 90].filter((age) => age > from)
+  const lastAge = Math.max(105, from + 10)
+  const curve = (i: number): Point[] =>
+    Array.from({ length: lastAge - from + 1 }, (_, k) => ({ x: from + k, y: chanceOfReaching(outlooks[i]!, from + k) }))
+  const source = loaded[0]?.source
+
   return (
     <div className="flex flex-col gap-4">
-      <label className="flex flex-col gap-1 self-start text-sm text-ink-soft">
-        Country of residence
-        <select
-          className="max-w-full rounded-sm border border-rule bg-paper px-2 py-1.5 text-base text-ink"
-          value={chosen}
-          onChange={(e) => setChosen(e.target.value)}
-        >
-          <option value="">Choose a country</option>
-          {COUNTRIES.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </label>
       {columns.length > 0 && !ready && failed.length === 0 && (
         <p className="text-sm text-ink-soft">Loading the figures for {countryName(chosen)}…</p>
       )}

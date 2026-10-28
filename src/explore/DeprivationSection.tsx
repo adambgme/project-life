@@ -1,25 +1,43 @@
-import { useState } from 'react'
-import { DEPRIVATION_SOURCE, deprivationOutlook } from '../life/deprivation'
+import { DEPRIVATION_SOURCE, type DeprivationOutlook } from '../life/deprivation'
 import type { Sex } from '../life/mortality'
 import type { Nation } from '../life/store'
-import { DotRows } from './DotRows'
 import { longDate } from './format'
 
 const ORDINAL = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th']
 
-/** Life expectancy across areas from most to least deprived (England in tenths, Wales in fifths), with an optional
- * pick of your own area's group. Never a postcode: the pick stays on this page and isn't saved. */
-export function DeprivationSection({ nation, sex, age, who }: { nation: Nation; sex: Sex; age: number; who: string }) {
-  const outlook = deprivationOutlook(nation, sex, age)
-  const [mine, setMine] = useState<number | null>(null)
-  const chosen = mine !== null && mine <= outlook.groups.length ? mine : null
+/** "1st tenth (most deprived)"; `short` drops the brackets for the narrow dot-plot labels. */
+export function groupName(outlook: DeprivationOutlook, group: number, short = false): string {
+  const end = group === 1 ? 'most deprived' : group === outlook.groups.length ? 'least deprived' : ''
+  const base = `${ORDINAL[group - 1]} ${outlook.unit}`
+  return !end ? base : short ? `${base}, ${end}` : `${base} (${end})`
+}
+
+/** The optional pick of your own area's group. Never a postcode: the pick stays on this page and isn't saved. */
+export function AreaPicker({ outlook, mine, onPick }: { outlook: DeprivationOutlook; mine: number | null; onPick: (group: number | null) => void }) {
+  return (
+    <label className="flex flex-col gap-1 text-sm text-ink-soft">
+      Your area's {outlook.unit} (optional)
+      <select
+        className="rounded-sm border border-rule bg-paper px-2 py-1.5 text-base text-ink"
+        value={mine ?? ''}
+        onChange={(e) => onPick(e.target.value ? Number(e.target.value) : null)}
+      >
+        <option value="">I don't know, or rather not say</option>
+        {outlook.groups.map((g) => (
+          <option key={g.group} value={g.group}>
+            {groupName(outlook, g.group)}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+/** Life expectancy across areas from most to least deprived (England in tenths, Wales in fifths): what the groups
+ * are, the healthy years, and the table. Its dots are in the comparison strip. */
+export function DeprivationSection({ outlook, nation, sex, age }: { outlook: DeprivationOutlook; nation: Nation; sex: Sex; age: number }) {
   const [most, least] = [outlook.groups[0]!, outlook.groups.at(-1)!]
-  /** "1st tenth (most deprived)"; `short` drops the brackets for the narrow dot-plot labels. */
-  const name = (group: number, short = false) => {
-    const end = group === 1 ? 'most deprived' : group === outlook.groups.length ? 'least deprived' : ''
-    const base = `${ORDINAL[group - 1]} ${outlook.unit}`
-    return !end ? base : short ? `${base}, ${end}` : `${base} (${end})`
-  }
+  const name = (group: number) => groupName(outlook, group)
   const people = sex === 'both' ? 'people' : sex === 'male' ? 'men' : 'women'
   const ranged = outlook.groups.every((g) => g.range)
 
@@ -39,32 +57,6 @@ export function DeprivationSection({ nation, sex, age, who }: { nation: Nation; 
           ONS covers England and Wales only, so these are England's figures.
         </p>
       )}
-      <label className="flex flex-col gap-1 self-start text-sm text-ink-soft">
-        Your area's {outlook.unit} (optional)
-        <select
-          className="rounded-sm border border-rule bg-paper px-2 py-1.5 text-base text-ink"
-          value={chosen ?? ''}
-          onChange={(e) => setMine(e.target.value ? Number(e.target.value) : null)}
-        >
-          <option value="">I don't know, or rather not say</option>
-          {outlook.groups.map((g) => (
-            <option key={g.group} value={g.group}>
-              {name(g.group)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <DotRows
-        label={`Average age at death for ${who} by area deprivation, ${outlook.area}`}
-        testId="deprivation"
-        rows={outlook.groups.map((g) => ({
-          key: String(g.group),
-          label: name(g.group, true),
-          value: g.ageAtDeath,
-          chosen: g.group === chosen,
-          chosenWords: 'your area',
-        }))}
-      />
       <details className="text-sm">
         <summary className="cursor-pointer text-ink-soft">Show the table</summary>
         <table className="mt-2 w-full max-w-lg text-left">

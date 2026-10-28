@@ -40,6 +40,10 @@ test('the figures sit below the grid and show the whole picture', async ({ page 
   const nations = page.getByTestId('nations').getByRole('listitem')
   await expect(nations).toHaveCount(5)
   await expect(page.getByTestId('nations')).toContainText('Scotland (where you live)')
+  // Nations and neighbourhoods on one scale, with the widest gap said in words.
+  await expect(page.getByTestId('deprivation').getByRole('listitem')).toHaveCount(10)
+  await expect(page.getByTestId('widest-gap')).toHaveText(/^The widest gap is between neighbourhoods: \d+\.\d years from the most to the least deprived tenth, against \d\.\d across the UK's nations\.$/)
+  await expect(page.getByTestId('countries')).toHaveCount(0)
 
   // Every chart has a table view.
   await page.getByText('Show the numbers').first().click()
@@ -159,6 +163,10 @@ test('if you lived in another country: the UK and the chosen country side by sid
   const ages = (await table.getByRole('row', { name: /Average age at death/ }).getByRole('cell').allTextContents()).map(Number)
   expect(ages[1]!).toBeGreaterThan(ages[0]!)
   await expect(table.getByRole('row', { name: /Chance of reaching 90/ })).toBeVisible()
+  // Both join the comparison strip, on the same scale as the nations and neighbourhoods.
+  const countries = page.getByTestId('countries').getByRole('listitem')
+  await expect(countries).toHaveCount(2)
+  await expect(countries.nth(1)).toContainText('Japan (the country you chose)')
   // The two survival curves, told apart by a legend and by line style, with both in the readout.
   await expect(page.getByTestId('chart-legend').locator('li')).toHaveText(['Living in United Kingdom', 'Living in Japan'])
   const curves = page.getByRole('img', { name: /Survival curves for people like you: living in United Kingdom, \d+% reach 80; living in Japan/ })
