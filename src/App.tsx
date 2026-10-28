@@ -149,6 +149,7 @@ export function App() {
         category: (category) => resolveColour(categoryColour(category, colours)),
       },
       chances,
+      patterns: !isExample && profile.patterns,
       labels,
       title: 'Your Life',
       subtitle: `A life in ${UNIT[view]}`,

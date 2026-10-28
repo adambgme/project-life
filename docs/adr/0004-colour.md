@@ -46,4 +46,5 @@ People can still choose their own category colours. Those are theirs, and the pa
 - **Future eras:** patterns on eras still ahead are drawn in the era's own colour, since paper lines vanish on their
   pale wash.
 
-**Not yet covered.** The share image (canvas) draws neither patterns nor goal and moment entries in its key.
+**Share image.** The canvas draws the same patterns (when the setting is on) and the same key as the page: Lived, Now
+with its ring, each era, Moment and Goal (#34).
