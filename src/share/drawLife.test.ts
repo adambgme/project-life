@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { layoutFor, legendLines } from './drawLife'
+import { layoutFor, legendEntries, legendLines } from './drawLife'
 
 const measure = (text: string) => text.length * 7
 
@@ -33,5 +33,29 @@ describe('share image layout', () => {
     const [line] = legendLines([{ label: 'x'.repeat(200), colour: '#000' }], 300, measure)
     expect(line![0]!.label.endsWith('…')).toBe(true)
     expect(18 + measure(line![0]!.label)).toBeLessThanOrEqual(300)
+  })
+})
+
+describe('the share image key', () => {
+  const colours = { paper: '#fff', ink: '#000', inkSoft: '#555', rule: '#ccc', lived: '#000', today: '#a34a24', accent: '#3f6b45', category: () => '#123456' }
+  const era = { id: 'e', label: 'University', category: 'education' as const, start: { year: 2008, month: 9, day: 20 }, end: null }
+  const moment = { id: 'm', label: 'Moved', category: 'home' as const, date: { year: 2020, month: 3, day: 1 } }
+  const goal = { id: 'g', label: 'Retire', category: 'work' as const, target: { kind: 'age' as const, age: 60 } }
+
+  it('matches the page: lived, now with its ring, each era, then moments and goals when there are any', () => {
+    const entries = legendEntries({ eras: new Map([['e', era]]), moments: new Map([['m', moment]]), goals: new Map([['g', goal]]), colours })
+    expect(entries.map((e) => [e.label, e.mark])).toEqual([
+      ['Lived', 'fill'],
+      ['Now', 'now'],
+      ['University', 'fill'],
+      ['Moment', 'moment'],
+      ['Goal', 'goal'],
+    ])
+    expect(entries[2]!.category).toBe('education')
+  })
+
+  it('leaves out moments and goals when there are none', () => {
+    const entries = legendEntries({ eras: new Map(), moments: new Map(), goals: new Map(), colours })
+    expect(entries.map((e) => e.label)).toEqual(['Lived', 'Now'])
   })
 })

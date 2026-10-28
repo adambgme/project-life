@@ -20,12 +20,16 @@ export type DrawInput = {
   /** Resolved colours (no CSS variables: canvas can't read them). */
   colours: { paper: string; ink: string; inkSoft: string; rule: string; lived: string; today: string; accent: string; category: (c: Category) => string }
   chances?: GridChances
+  /** Texture each era by its category, as on the page ("Patterns on eras"). */
+  patterns?: boolean
   labels: boolean
   title: string
   subtitle: string
 }
 
-export type LegendEntry = { label: string; colour: string }
+/** One entry in the key, drawn as on the page: a fill (textured by `category` when patterns are on), this week's ring,
+ * a moment's dot or a goal's outline. */
+export type LegendEntry = { label: string; colour: string; mark?: 'fill' | 'now' | 'moment' | 'goal'; category?: Category }
 /** Measures text width in px for the key's font (the canvas's measureText in the browser). */
 export type Measure = (text: string) => number
 
@@ -35,7 +39,7 @@ const ENTRY_GAP = 18
 
 /** Lay the key's entries out in lines that fit `maxWidth`, shortening any label too long for a line on its own. */
 export function legendLines(entries: LegendEntry[], maxWidth: number, measure: Measure) {
-  const lines: { label: string; colour: string; x: number }[][] = [[]]
+  const lines: (LegendEntry & { x: number })[][] = [[]]
   let x = 0
   for (const entry of entries) {
     let label = entry.label
@@ -45,7 +49,7 @@ export function legendLines(entries: LegendEntry[], maxWidth: number, measure: M
       lines.push([])
       x = 0
     }
-    lines[lines.length - 1]!.push({ label, colour: entry.colour, x })
+    lines[lines.length - 1]!.push({ ...entry, label, x })
     x += w
   }
   return lines
@@ -70,14 +74,62 @@ export function layoutFor(input: Pick<DrawInput, 'view' | 'years' | 'labels'>, l
   return { perRow, rows, yearsPerRow, cell, gap, pad, left, top, width, height, rowTop, keyTop, keyLines }
 }
 
-/** The key's entries: lived, now, then each era. */
-export function legendEntries(input: Pick<DrawInput, 'eras' | 'colours'>): LegendEntry[] {
+/** The key's entries, matching the page's: lived, now, each era, then moments and goals when there are any. */
+export function legendEntries(input: Pick<DrawInput, 'eras' | 'moments' | 'goals' | 'colours'>): LegendEntry[] {
   const c = input.colours
   return [
-    { label: 'Lived', colour: c.lived },
-    { label: 'Now', colour: c.today },
-    ...[...input.eras.values()].map((e) => ({ label: e.label, colour: c.category(e.category) })),
+    { label: 'Lived', colour: c.lived, mark: 'fill' },
+    { label: 'Now', colour: c.today, mark: 'now' },
+    ...[...input.eras.values()].map((e): LegendEntry => ({ label: e.label, colour: c.category(e.category), mark: 'fill', category: e.category })),
+    ...(input.moments.size ? [{ label: 'Moment', colour: c.ink, mark: 'moment' } as const] : []),
+    ...(input.goals.size ? [{ label: 'Goal', colour: c.ink, mark: 'goal' } as const] : []),
   ]
+}
+
+/** The page's texture for each category (src/life/story.ts): parallel lines at an angle (0 runs across), a crosshatch,
+ * or rings. Other stays plain. */
+const PATTERN_ANGLES: Record<Category, number[] | 'rings'> = {
+  home: [45],
+  work: [-45],
+  education: [0],
+  relationships: [45, -45],
+  travel: [90],
+  health: 'rings',
+  other: [],
+}
+
+/** Draw a category's texture over the square at (x, y), clipped to it. */
+function drawPattern(ctx: CanvasRenderingContext2D, category: Category, x: number, y: number, size: number, stroke: string, alpha: number) {
+  const angles = PATTERN_ANGLES[category]
+  if (angles.length === 0) return
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(x, y, size, size)
+  ctx.clip()
+  ctx.strokeStyle = stroke
+  ctx.globalAlpha = alpha
+  ctx.lineWidth = 1
+  const cx = x + size / 2
+  const cy = y + size / 2
+  ctx.beginPath()
+  if (angles === 'rings') {
+    for (let r = 1.5; r < size; r += 3) {
+      ctx.moveTo(cx + r, cy)
+      ctx.arc(cx, cy, r, 0, Math.PI * 2)
+    }
+  } else {
+    for (const angle of angles) {
+      const [dx, dy] = [Math.cos((angle * Math.PI) / 180), Math.sin((angle * Math.PI) / 180)]
+      for (let t = -size; t <= size; t += 4) {
+        // A line through the centre's offset point, along the angle, long enough to cross the square.
+        const [px, py] = [cx - dy * t, cy + dx * t]
+        ctx.moveTo(px - dx * size, py - dy * size)
+        ctx.lineTo(px + dx * size, py + dy * size)
+      }
+    }
+  }
+  ctx.stroke()
+  ctx.restore()
 }
 
 const KEY_FONT = '13px "Source Serif 4 Variable", Georgia, serif'
@@ -125,6 +177,7 @@ export function drawLife(ctx: CanvasRenderingContext2D, input: DrawInput) {
     }
     const state = index === input.todayIndex ? 'today' : index < input.todayIndex ? 'lived' : 'ahead'
     const story = input.story.get(index)
+    const topEra = story?.eras[0] ? input.eras.get(story.eras[0])! : undefined
     const eraColours = (story?.eras ?? []).map((id) => c.category(input.eras.get(id)!.category))
     const chance = input.chances && state === 'ahead' ? input.chances.principal[index]! : 1
 
@@ -146,6 +199,10 @@ export function drawLife(ctx: CanvasRenderingContext2D, input: DrawInput) {
     ctx.lineWidth = 1
     ctx.strokeRect(x + 0.5, y + 0.5, box - 1, box - 1)
     ctx.globalAlpha = 1
+    // Patterns: paper lines over a solid era; on the pale wash of an era still ahead, the era's own colour.
+    if (input.patterns && topEra && state !== 'today') {
+      drawPattern(ctx, topEra.category, x, y, box, state === 'ahead' ? eraColours[0]! : c.paper, state === 'ahead' ? 1 : 0.75)
+    }
     // Overlapping eras: thin stripes along the bottom.
     eraColours.slice(1, 3).forEach((colour, i) => {
       ctx.fillStyle = colour
@@ -179,8 +236,35 @@ export function drawLife(ctx: CanvasRenderingContext2D, input: DrawInput) {
       const y = L.keyTop + i * KEY_LINE
       for (const entry of line) {
         const x = L.pad + L.left + entry.x
-        ctx.fillStyle = entry.colour
-        ctx.fillRect(x, y - 10, 12, 12)
+        const top = y - 10
+        if (entry.mark === 'moment' || entry.mark === 'goal') {
+          ctx.strokeStyle = c.rule
+          ctx.lineWidth = 1
+          ctx.strokeRect(x + 0.5, top + 0.5, 11, 11)
+        } else {
+          ctx.fillStyle = entry.colour
+          ctx.fillRect(x, top, 12, 12)
+        }
+        if (entry.mark === 'now') {
+          ctx.strokeStyle = c.ink
+          ctx.lineWidth = 2
+          ctx.strokeRect(x - 1.5, top - 1.5, 15, 15)
+        }
+        if (entry.mark === 'goal') {
+          ctx.strokeStyle = c.ink
+          ctx.lineWidth = 2
+          ctx.strokeRect(x + 1, top + 1, 10, 10)
+        }
+        if (entry.mark === 'moment') {
+          ctx.beginPath()
+          ctx.arc(x + 6, top + 6, 2.8, 0, Math.PI * 2)
+          ctx.fillStyle = c.paper
+          ctx.fill()
+          ctx.strokeStyle = c.ink
+          ctx.lineWidth = 1
+          ctx.stroke()
+        }
+        if (input.patterns && entry.category) drawPattern(ctx, entry.category, x, top, 12, c.paper, 0.75)
         ctx.fillStyle = c.ink
         ctx.fillText(entry.label, x + SWATCH_GAP, y)
       }

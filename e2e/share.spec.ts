@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
-import { expect, test } from './fixtures'
+import { expect, openSettings, test } from './fixtures'
 
 const NOW = new Date('2026-10-26T12:00:00Z')
 const SAVED = {
@@ -74,4 +74,14 @@ test('a share image: no words by default, labels when asked', async ({ page }) =
   expect(labelled.width).toBeGreaterThan(plain.width)
   expect(labelled.height).toBeGreaterThan(plain.height)
   await expect(page.getByText('Anyone you share it with will see the names of your eras.')).toBeVisible()
+})
+
+test('with patterns on eras, the share image draws them too', async ({ page }) => {
+  const plain = await saveImage(page, true)
+  await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click()
+  await openSettings(page)
+  await page.getByRole('checkbox', { name: /Patterns on eras/ }).check()
+  const textured = await saveImage(page, true)
+  expect([textured.width, textured.height]).toEqual([plain.width, plain.height])
+  expect(textured.png.equals(plain.png)).toBe(false)
 })
