@@ -19,6 +19,8 @@ type Props = {
   xLabel: string
   /** Labelled points along the line, e.g. "1 in 2". */
   marks?: { x: number; label: string }[]
+  /** One point picked out, with guides to both axes; it glides when it changes (the survival steps). */
+  highlight?: { x: number; label: string }
   /** The readout for the hovered or focused point (also the table rows). */
   describe: (p: Point) => { value: string; detail?: string }
   /** Columns for the table view. */
@@ -44,7 +46,8 @@ function useWidth<T extends Element>() {
 /** A line chart (one series, or two to compare) with an optional band: 2px line, 10% wash, hairline grid, crosshair readout on hover
  * and with the arrow keys, and a table view so no value depends on hovering. */
 export function LineChart(props: Props) {
-  const { points, compare, label, summary, yScale = 'linear', yDomain, yTicks, formatY, xTicks, xLabel, marks = [], describe, table } = props
+  const { points, compare, label, summary, yScale = 'linear', yDomain, yTicks, formatY, xTicks, xLabel, marks = [], highlight, describe, table } =
+    props
   const id = useId()
   const [active, setActive] = useState<number | null>(null)
   const [frame, measured] = useWidth<HTMLDivElement>()
@@ -139,13 +142,44 @@ export function LineChart(props: Props) {
           </text>
           {band && <path d={band} fill="var(--color-accent)" fillOpacity={0.12} />}
           {compare && <path d={path(compare.points)} fill="none" stroke="var(--color-ink)" strokeWidth={2} strokeDasharray={dashed} strokeLinejoin="round" />}
-          <path d={line} fill="none" stroke="var(--color-accent)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          {/* pathLength lets the line draw itself on first view (styles.css, [data-draw]). */}
+          <path d={line} pathLength={1} fill="none" stroke="var(--color-accent)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" data-draw />
+          {highlight &&
+            (() => {
+              const at = points.reduce((a, b) => (Math.abs(b.x - highlight.x) < Math.abs(a.x - highlight.x) ? b : a))
+              const [hx, hy] = [sx(at.x), sy(at.y)]
+              // The label goes above and to the right, clear of a falling line; near the right edge, below and to the left.
+              const right = hx > W - 140
+              return (
+                <g
+                  aria-hidden
+                  className="transition-transform duration-700 ease-(--ease-calm)"
+                  style={{ transform: `translate(${hx}px, ${hy}px)` }}
+                  data-testid="chart-highlight"
+                  data-x={at.x}
+                >
+                  <line x1={0} x2={0} y1={0} y2={H - M.bottom - hy} stroke="var(--color-ink)" strokeWidth={1} strokeDasharray="2 3" />
+                  <line x1={0} x2={M.left - hx} y1={0} y2={0} stroke="var(--color-ink)" strokeWidth={1} strokeDasharray="2 3" />
+                  <circle r={7} fill="var(--color-paper)" stroke="var(--color-ink)" strokeWidth={2} />
+                  <circle r={3} fill="var(--color-ink)" />
+                  <text x={right ? -12 : 12} y={right ? 22 : -12} textAnchor={right ? 'end' : 'start'} className="fill-ink font-display text-[14px] font-semibold">
+                    {highlight.label}
+                  </text>
+                </g>
+              )
+            })()}
           {marks.map((m) => {
             const at = points.reduce((a, b) => (Math.abs(b.x - m.x) < Math.abs(a.x - m.x) ? b : a))
             return (
               <g key={m.label}>
                 <circle cx={sx(at.x)} cy={sy(at.y)} r={4.5} fill="var(--color-accent)" stroke="var(--color-paper)" strokeWidth={2} />
-                <text x={sx(at.x) + 8} y={sy(at.y) - 8} className="fill-ink text-[12px]">
+                {/* Above and to the right of the point, clear of a falling line; near the right edge, below and to the left. */}
+                <text
+                  x={sx(at.x) + (sx(at.x) > W - 70 ? -8 : 8)}
+                  y={sy(at.y) + (sx(at.x) > W - 70 ? 18 : -8)}
+                  textAnchor={sx(at.x) > W - 70 ? 'end' : 'start'}
+                  className="fill-ink text-[12px]"
+                >
                   {m.label}
                 </text>
               </g>
