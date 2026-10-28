@@ -26,7 +26,7 @@ export function boxChances(
   const make = () => new Float32Array(total).fill(1)
   const result = { principal: make(), low: make(), high: make(), half: -1, tenth: -1 }
   for (let index = Math.max(0, now + 1); index < total; index++) {
-    const age = daysBetween(birth, boxRange(view, birth, index).start) / 365.25
+    const age = ageAt(view, birth, index)
     result.principal[index] = chanceOfReaching(outlooks.principal, age)
     result.low[index] = chanceOfReaching(outlooks.low, age)
     result.high[index] = chanceOfReaching(outlooks.high, age)
@@ -34,6 +34,21 @@ export function boxChances(
     if (result.tenth < 0 && result.principal[index]! < 0.1) result.tenth = index
   }
   return result
+}
+
+/** The first box ahead where fewer than half of people like you are still alive (-1 if it's beyond the grid): the
+ * one mark the grid shows even without the full chances. */
+export function halfBox(view: View, birth: CalendarDate, today: CalendarDate, years: number, principal: Outlook): number {
+  const total = years * BOXES_PER_YEAR[view]
+  for (let index = Math.max(0, boxIndex(view, birth, today) + 1); index < total; index++) {
+    if (chanceOfReaching(principal, ageAt(view, birth, index)) < 0.5) return index
+  }
+  return -1
+}
+
+/** Age in years at the start of a box. */
+function ageAt(view: View, birth: CalendarDate, index: number): number {
+  return daysBetween(birth, boxRange(view, birth, index).start) / 365.25
 }
 
 /** A chance in gentle, rounded words: "about 3 in 4", "about 7 in 10", "fewer than 1 in 100". */

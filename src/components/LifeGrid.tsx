@@ -17,6 +17,9 @@ type Props = {
   colourOf: (entry: { category: Category }) => string
   /** The statistics overlay, when shown. */
   chances?: GridChances
+  /** Without the overlay: the box where fewer than half of people like you are still alive, marked on its own (-1 or
+   * absent for none). */
+  half?: number
   /** Texture each era by its category, so eras don't rely on colour alone. */
   patterns?: boolean
   /** Open a box (click, tap or Enter); absent when the grid is read-only. */
@@ -90,15 +93,20 @@ function cellLabel(view: View, index: number, total: number | null, birthDate: C
 
 type Lookup = { eras: Map<string, Era>; moments: Map<string, Moment>; goals: Map<string, Goal>; birth: CalendarDate | null; today: CalendarDate }
 
-/** "about 7 in 10 chance of being alive then", plus the 1-in-2 and 1-in-10 marks. */
-function chanceLabel(index: number, chances: GridChances | undefined, todayIndex: number): string {
-  if (!chances || index <= todayIndex) return ''
+/** "about 7 in 10 chance of being alive then", plus the 1-in-2 and 1-in-10 marks (the 1-in-2 mark alone without the
+ * overlay). */
+function chanceLabel(index: number, chances: GridChances | undefined, half: number, todayIndex: number): string {
+  if (index <= todayIndex) return ''
+  if (!chances) return index === half ? 'about half of people like you live beyond here' : ''
   const p = chances.principal[index]!
   const words = p >= 0.995 ? 'almost certainly alive then' : `${chanceWords(p)} chance of being alive then`
   if (index === chances.half) return `${words}; about half of people like you live beyond here`
   if (index === chances.tenth) return `${words}; about 1 in 10 people like you live beyond here`
   return words
 }
+
+/** The outline that marks the 1-in-2 (and 1-in-10) box. */
+const HALF_MARK: CSSProperties = { outline: '1.5px solid var(--color-ink)', outlineOffset: '1px' }
 
 /** Future boxes fade with the chance of being alive; a soft tint shows where ONS's projections disagree. */
 function chanceStyle(index: number, chances: GridChances): CSSProperties {
@@ -108,8 +116,7 @@ function chanceStyle(index: number, chances: GridChances): CSSProperties {
   return {
     borderColor: `color-mix(in srgb, var(--color-ink-soft) ${Math.round(15 + 85 * p)}%, transparent)`,
     backgroundColor: spread > 0.02 ? `color-mix(in srgb, var(--color-accent) ${Math.round(Math.min(35, spread * 140))}%, transparent)` : undefined,
-    outline: marker ? '1.5px solid var(--color-ink)' : undefined,
-    outlineOffset: marker ? '1px' : undefined,
+    ...(marker ? HALF_MARK : undefined),
   }
 }
 
@@ -163,6 +170,8 @@ function storyStyle(
 /** The life grid for one view: a keyboard-navigable ARIA grid with one tab stop (ADR 0001). */
 export const LifeGrid = memo(function LifeGrid(props: Props) {
   const { view, birthDate, today, years, story, eras, moments, goals, colourOf, chances, patterns = false, onOpenBox } = props
+  const half = chances ? chances.half : (props.half ?? -1)
+  const marks = !!chances || half >= 0
   const lookup: Lookup = { eras, moments, goals, birth: birthDate, today }
   const layout = LAYOUTS[view]
   const perYear = BOXES_PER_YEAR[view]
@@ -225,7 +234,7 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
       {layout.columnMarks.length > 0 && (
         <div
           aria-hidden
-          className={`ml-8 grid text-[10px] text-ink-soft tabular-nums ${chances ? 'mr-10' : ''}`}
+          className={`ml-8 grid text-[10px] text-ink-soft tabular-nums ${marks ? 'mr-10' : ''}`}
           style={{ gridTemplateColumns: `repeat(${layout.perRow}, minmax(0, 1fr))` }}
           data-testid="column-marks"
         >
@@ -244,7 +253,7 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
         {detailIndex !== null &&
           [
             cellLabel(view, detailIndex, null, birthDate, todayIndex),
-            chanceLabel(detailIndex, chances, todayIndex),
+            chanceLabel(detailIndex, chances, half, todayIndex),
             storyLabel(story.get(detailIndex), lookup),
           ]
             .filter(Boolean)
@@ -266,9 +275,7 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
           const ageAtRow = row * yearsPerRow
           const rowStart = row * layout.perRow
           const inRow = (i: number) => i >= rowStart && i < rowStart + layout.perRow
-          const mark = chances
-            ? [inRow(chances.half) && '1 in 2', inRow(chances.tenth) && '1 in 10'].filter(Boolean).join(' · ')
-            : ''
+          const mark = [inRow(half) && '1 in 2', chances && inRow(chances.tenth) && '1 in 10'].filter(Boolean).join(' · ')
           return (
             <div key={row} className={`flex items-center ${row > 0 && ageAtRow % layout.breakEvery === 0 ? 'mt-1.5' : ''}`}>
               <span aria-hidden className="w-8 shrink-0 pr-2 text-right text-[10px] leading-none text-ink-soft tabular-nums">
@@ -284,10 +291,11 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
                   const index = row * layout.perRow + col
                   const state = index === todayIndex ? 'today' : index < todayIndex ? 'lived' : 'ahead'
                   const box = story.get(index)
-                  const about = [chanceLabel(index, chances, todayIndex), storyLabel(box, lookup)].filter(Boolean).join('. ')
+                  const about = [chanceLabel(index, chances, half, todayIndex), storyLabel(box, lookup)].filter(Boolean).join('. ')
                   const storyLook = storyStyle(box, state, lookup, colourOf, patterns)
                   // The chances overlay sits under any era or goal styling, so its marks stay visible.
-                  const chanceLook = chances && state === 'ahead' ? chanceStyle(index, chances) : undefined
+                  const chanceLook =
+                    state !== 'ahead' ? undefined : chances ? chanceStyle(index, chances) : index === half ? HALF_MARK : undefined
                   const look = chanceLook || storyLook ? { ...chanceLook, ...storyLook } : undefined
                   return (
                     <div
@@ -302,6 +310,7 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
                       data-moments={box?.moments.length || undefined}
                       data-goals={box?.goals.length || undefined}
                       data-chance={chances && state === 'ahead' ? chances.principal[index]!.toFixed(3) : undefined}
+                      data-half={index === half || undefined}
                       style={look}
                       onMouseEnter={() => setHoverIndex(index)}
                       onClick={() => {
@@ -325,7 +334,7 @@ export const LifeGrid = memo(function LifeGrid(props: Props) {
                   )
                 })}
               </div>
-              {chances && (
+              {marks && (
                 <span aria-hidden className="w-10 shrink-0 pl-1.5 text-[10px] leading-none whitespace-nowrap text-ink-soft" data-testid={mark ? 'chance-mark' : undefined}>
                   {mark}
                 </span>
