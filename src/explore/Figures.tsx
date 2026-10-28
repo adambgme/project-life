@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CalendarDate } from '../life/lifeMaths'
 import { chanceWords } from '../life/gridChances'
-import { chanceOfReaching, deathRate, outlook, type MortalityData } from '../life/mortality'
+import { ageAtChance, chanceOfReaching, deathRate, lifeProgress, outlook, type MortalityData } from '../life/mortality'
+import { whatsAhead } from '../life/ahead'
 import { NATION_NAMES, NATIONS, type Nation, type Profile } from '../life/store'
 import { deprivationOutlook } from '../life/deprivation'
 import { loadNation, useMortality } from '../life/useMortality'
+import { AheadSection } from './AheadSection'
 import { CausesSection } from './CausesSection'
 import { CountryPicker, CountrySection, useCountryCompare } from './CountrySection'
 import { AreaPicker, DeprivationSection, groupName } from './DeprivationSection'
@@ -83,6 +85,12 @@ export function Figures({ profile, today, isExample }: Props) {
   const section = 'flex flex-col gap-3 border-t border-rule pt-5'
   const h3 = 'font-display text-2xl'
   const source = `${data.source.attribution}. ${data.source.edition} life tables, released ${longDate(data.source.released)}.`
+  // Every chart from the life tables points to the one full source line, at the end.
+  const sourceLink = (
+    <p className="text-xs text-ink-soft">
+      Source: ONS life tables (<a className="underline" href="#sources">see Sources</a>).
+    </p>
+  )
 
   const places: PlaceGroup[] = [
     {
@@ -195,7 +203,7 @@ export function Figures({ profile, today, isExample }: Props) {
               />
             )}
           />
-          <p className="text-xs text-ink-soft">{source}</p>
+          {sourceLink}
         </section>
 
         <section className={section} aria-labelledby="reach-title" data-reveal>
@@ -224,7 +232,7 @@ export function Figures({ profile, today, isExample }: Props) {
               })}
             </tbody>
           </table>
-          <p className="text-xs text-ink-soft">{source}</p>
+          {sourceLink}
         </section>
 
         <section className={section} aria-labelledby="risk-title" data-reveal>
@@ -247,7 +255,7 @@ export function Figures({ profile, today, isExample }: Props) {
             describe={(p) => ({ value: `${oneIn(p.y)} at ${p.x}`, detail: 'chance of dying within the year' })}
             table={{ xHeader: 'Age', yHeader: 'Yearly risk', every: 5 }}
           />
-          <p className="text-xs text-ink-soft">{source}</p>
+          {sourceLink}
         </section>
 
         <section className={section} aria-labelledby="causes-title">
@@ -280,6 +288,10 @@ export function Figures({ profile, today, isExample }: Props) {
           )}
           <PlaceStrip groups={places} />
           {gap && <p data-testid="widest-gap">{gap}</p>}
+          <p className="text-xs text-ink-soft">
+            UK nations: ONS life tables (<a className="underline" href="#sources">see Sources</a>). Neighbourhoods and other
+            countries: below.
+          </p>
 
           <h4 className="mt-4 font-display text-xl">Neighbourhoods</h4>
           <DeprivationSection outlook={deprivation} nation={profile.nation} sex={profile.sex} age={from} />
@@ -290,7 +302,47 @@ export function Figures({ profile, today, isExample }: Props) {
           ) : (
             <CountrySection compare={compare} today={today} options={options} who={who} />
           )}
-          <p className="text-xs text-ink-soft">UK nations: {source}</p>
+        </section>
+
+        <section className={section} aria-labelledby="ahead-title" data-reveal>
+          <h3 id="ahead-title" className={h3}>
+            What's ahead
+          </h3>
+          <AheadSection
+            ahead={whatsAhead(profile.birthDate, today, lifeProgress(principal, profile.birthDate, today).yearsLeft)}
+            lifeExpectancy={principal.lifeExpectancy}
+            isExample={isExample}
+          />
+        </section>
+
+        <aside className="flex flex-col gap-2 border-y border-ink py-6" aria-labelledby="ending-title" data-testid="ending">
+          <h3 id="ending-title" className="font-display text-sm tracking-[0.12em] text-ink-soft uppercase">
+            In short
+          </h3>
+          <p className="font-display text-2xl leading-snug text-balance">
+            Half of {who} reach {Math.floor(ageAtChance(principal, 0.5))}, and about 1 in 10 reach{' '}
+            {Math.floor(ageAtChance(principal, 0.1))}.
+          </p>
+          {gap && <p className="font-display text-xl leading-snug text-balance">{gap}</p>}
+          <p className="text-ink-soft">
+            Every figure here is an average for a large group of people. Your own health and circumstances matter far more.
+          </p>
+        </aside>
+
+        <section aria-labelledby="sources-title" id="sources" className="flex scroll-mt-4 flex-col gap-2 text-sm text-ink-soft">
+          <h3 id="sources-title" className="font-display text-lg text-ink">
+            Sources
+          </h3>
+          <ul className="flex list-disc flex-col gap-1 pl-5">
+            <li>
+              Life tables: {source}{' '}
+              <a className="underline" href={data.source.url}>
+                ONS {data.source.edition} life tables
+              </a>
+              .
+            </li>
+            <li>Causes of death, neighbourhoods and other countries: given with each.</li>
+          </ul>
         </section>
       </div>
     </section>

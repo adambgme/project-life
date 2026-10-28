@@ -167,6 +167,15 @@ body {
       animation-timeline: view();
       animation-range: entry 0% entry 100%;
     }
+    /* The summers fill in from the first as the row comes up the screen. */
+    [data-summers] {
+      view-timeline: --summers;
+    }
+    [data-summers] > span {
+      animation: appear linear both;
+      animation-timeline: --summers;
+      animation-range: cover calc(var(--p) * 30%) cover calc(var(--p) * 30% + 10%);
+    }
     /* A chart's line draws itself as the chart comes up the screen, finished once the chart is wholly in view (a sticky
        chart included). */
     [data-draw] {
