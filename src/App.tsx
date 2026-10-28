@@ -275,7 +275,8 @@ export function App() {
             </span>
           </div>
         )}
-        <div className="flex justify-center">
+        {/* A new view fades in rather than jumping (styles.css). */}
+        <div key={view} className="flex justify-center" data-grid-frame>
           <LifeGrid
             view={view}
             birthDate={birthDate}

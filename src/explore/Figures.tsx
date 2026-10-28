@@ -109,7 +109,7 @@ export function Figures({ profile, today, isExample }: Props) {
           Change these in Settings.
         </p>
 
-        <section className={section} aria-labelledby="survival-title">
+        <section className={section} aria-labelledby="survival-title" data-reveal>
           <h3 id="survival-title" className={h3}>
             Your survival curve
           </h3>
@@ -139,7 +139,7 @@ export function Figures({ profile, today, isExample }: Props) {
           <p className="text-xs text-ink-soft">{source}</p>
         </section>
 
-        <section className={section} aria-labelledby="reach-title">
+        <section className={section} aria-labelledby="reach-title" data-reveal>
           <h3 id="reach-title" className={h3}>
             Chance of reaching each age
           </h3>
@@ -168,7 +168,7 @@ export function Figures({ profile, today, isExample }: Props) {
           <p className="text-xs text-ink-soft">{source}</p>
         </section>
 
-        <section className={section} aria-labelledby="risk-title">
+        <section className={section} aria-labelledby="risk-title" data-reveal>
           <h3 id="risk-title" className={h3}>
             Yearly risk, from here on
           </h3>
@@ -202,7 +202,7 @@ export function Figures({ profile, today, isExample }: Props) {
           <CausesSection age={from} sex={profile.sex} outsideEnglandWales={profile.nation === 'scotland' || profile.nation === 'northern-ireland'} />
         </section>
 
-        <section className={section} aria-labelledby="nations-title">
+        <section className={section} aria-labelledby="nations-title" data-reveal>
           <h3 id="nations-title" className={h3}>
             Across the UK
           </h3>
@@ -229,14 +229,14 @@ export function Figures({ profile, today, isExample }: Props) {
           <p className="text-xs text-ink-soft">{source}</p>
         </section>
 
-        <section className={section} aria-labelledby="deprivation-title">
+        <section className={section} aria-labelledby="deprivation-title" data-reveal>
           <h3 id="deprivation-title" className={h3}>
             Rich and poor neighbourhoods
           </h3>
           <DeprivationSection nation={profile.nation} sex={profile.sex} age={from} who={who} />
         </section>
 
-        <section className={section} aria-labelledby="country-title">
+        <section className={section} aria-labelledby="country-title" data-reveal>
           <h3 id="country-title" className={h3}>
             If you lived in another country
           </h3>
