@@ -17,6 +17,17 @@
 
 }
 
+/* Styles for the printed poster that differ from the screen's. They apply while printing, and also while the poster
+   is measured to fit the page (PrintShareDialog), so that measurement matches the paper. */
+@custom-variant poster {
+  @media print {
+    @slot;
+  }
+  &:where([data-print-measure] *) {
+    @slot;
+  }
+}
+
 /* Story categories, checked with the dataviz palette validator (docs/adr/0004-colour.md): in light mode every pair
    stays apart for red-green and normal vision; in dark mode, each category against its neighbours in the legend.
    Patterns (a setting) carry the difference without colour. Plain variables, not @theme: they are only used from
@@ -132,6 +143,47 @@ body {
   /* Switching weeks, months and years fades the new grid in. */
   [data-grid-frame] {
     animation: rise 350ms var(--ease-calm) both;
+  }
+}
+
+/* Settings: a sheet from the bottom on phones, a panel down the right on wider screens. It slides in. */
+.settings-panel {
+  inset: auto 0 0 0;
+  width: 100%;
+  max-width: none;
+  max-height: 75dvh;
+  border-top-width: 1px;
+  border-radius: 8px 8px 0 0;
+}
+@media (min-width: 48rem) {
+  .settings-panel {
+    inset: 0 0 0 auto;
+    width: 24rem;
+    height: 100dvh;
+    max-height: none;
+    border-top-width: 0;
+    border-left-width: 1px;
+    border-radius: 0;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .settings-panel {
+    transition:
+      translate 300ms var(--ease-calm),
+      display 300ms allow-discrete,
+      overlay 300ms allow-discrete;
+  }
+  @starting-style {
+    .settings-panel[open] {
+      translate: 0 100%;
+    }
+  }
+  @media (min-width: 48rem) {
+    @starting-style {
+      .settings-panel[open] {
+        translate: 100% 0;
+      }
+    }
   }
 }
 

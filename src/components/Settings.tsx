@@ -1,14 +1,6 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { Basis, Sex } from '../life/mortality'
-import { MAX_GRID_YEARS, NATIONS, type Nation, type Profile, type Statistics } from '../life/store'
-
-const NATION_NAMES: Record<Nation, string> = {
-  uk: 'United Kingdom',
-  england: 'England',
-  wales: 'Wales',
-  scotland: 'Scotland',
-  'northern-ireland': 'Northern Ireland',
-}
+import { MAX_GRID_YEARS, NATION_NAMES, NATIONS, type Nation, type Profile, type Statistics } from '../life/store'
 
 const SEX_NAMES: Record<Sex, string> = { female: 'Female', male: 'Male', both: 'Both, averaged' }
 
@@ -20,13 +12,15 @@ type Props = {
   gridYears: number
   /** The shortest length allowed: never at or below today's age. */
   minYears: number
-  /** Whether the chosen nation's tables are in use (or the UK's, while loading or after a failure). */
-  tablesStatus: 'ready' | 'loading' | 'failed'
   lifeExpectancy: number
   /** Chance (0–1) of people like you reaching the end of the grid. */
   chanceAtEnd: number
   source: { attribution: string; url: string; edition: string }
   onChange: (profile: Profile) => void
+  open: boolean
+  onClose: () => void
+  /** Delete everything saved in this browser; returns false if the person changed their mind. */
+  onForget: () => boolean
 }
 
 const field = 'rounded-sm border border-rule bg-paper px-2 py-1.5 text-base text-ink focus:border-ink'
@@ -34,10 +28,23 @@ const label = 'text-sm text-ink-soft'
 
 const STATISTICS_NAMES: Record<Statistics, string> = { numbers: 'just the numbers', grid: 'chances on the grid', hidden: 'statistics hidden' }
 
-/** Settings, folded away until wanted: the details that size the grid and the figures from ONS life tables, the
- * person's own grid length, and how much statistics to show. The closed summary says what's chosen. */
-export function YourDetails(props: Props) {
-  const { profile, suggestedYears, gridYears, minYears, tablesStatus, lifeExpectancy, chanceAtEnd, source, onChange } =
+/** What's chosen in Settings, in a line: "Female · England · projected rates · 100-year grid · just the numbers". */
+export function settingsSummary(profile: Profile, gridYears: number): string {
+  const hidden = profile.statistics === 'hidden'
+  return [
+    ...(hidden ? [] : [SEX_NAMES[profile.sex].replace(', averaged', ' sexes'), NATION_NAMES[profile.nation], profile.basis === 'cohort' ? 'projected rates' : "this year's rates"]),
+    `${gridYears}-year grid`,
+    STATISTICS_NAMES[profile.statistics],
+    ...(profile.patterns ? ['patterns on eras'] : []),
+  ].join(' · ')
+}
+
+/** Settings, in a panel beside the grid (a sheet from the bottom on phones): the details that size the grid and the
+ * figures from ONS life tables, the person's own grid length, how much statistics to show, and forgetting it all. It
+ * doesn't cover the page, so each change shows on the grid straight away. Escape or Done closes it, and focus goes
+ * back to whatever opened it. */
+export function Settings(props: Props) {
+  const { profile, suggestedYears, gridYears, minYears, lifeExpectancy, chanceAtEnd, source, onChange, open, onClose, onForget } =
     props
   const id = useId()
   const set = (patch: Partial<Profile>) => onChange({ ...profile, ...patch })
@@ -53,38 +60,40 @@ export function YourDetails(props: Props) {
     else setDraft(String(gridYears))
   }
 
-  const chosen = [
-    ...(hidden ? [] : [SEX_NAMES[profile.sex].replace(', averaged', ' sexes'), NATION_NAMES[profile.nation], profile.basis === 'cohort' ? 'projected rates' : "this year's rates"]),
-    `${gridYears}-year grid`,
-    STATISTICS_NAMES[profile.statistics],
-    ...(profile.patterns ? ['patterns on eras'] : []),
-  ]
+  const ref = useRef<HTMLDialogElement>(null)
+  // Shown without showModal: the page stays live behind it. Focus moves in on opening and back out on closing.
+  useEffect(() => {
+    const dialog = ref.current
+    if (!dialog) return
+    if (open && !dialog.open) {
+      const opener = document.activeElement as HTMLElement | null
+      dialog.show()
+      dialog.querySelector<HTMLElement>('h2')?.focus()
+      return () => opener?.focus()
+    }
+  }, [open])
+  useEffect(() => {
+    if (!open) ref.current?.close()
+  }, [open])
 
   return (
-    <div className="flex flex-col gap-3">
-    {tablesStatus !== 'ready' && (
-      <p role="status" className="border-l-2 border-today bg-paper-deep px-3 py-2 text-sm">
-        {tablesStatus === 'loading'
-          ? `Loading the figures for ${NATION_NAMES[profile.nation]}; showing the UK's meanwhile.`
-          : `The figures for ${NATION_NAMES[profile.nation]} couldn't be loaded, so these are the UK's. Try reloading the page.`}
-      </p>
-    )}
-    <details className="group border-y border-rule" data-testid="settings">
-      <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 py-3 [&::-webkit-details-marker]:hidden">
-        <span className="font-display text-sm tracking-[0.12em] text-ink uppercase">
-          <span aria-hidden className="mr-1.5 inline-block transition-transform group-open:rotate-90 motion-reduce:transition-none">
-            ›
-          </span>
-          Settings
-        </span>
-        <span className="text-sm text-ink-soft" data-testid="settings-summary">
-          {chosen.join(' · ')}
-        </span>
-      </summary>
-    <section aria-labelledby={`${id}-title`} className="flex flex-col gap-4 pb-4">
-      <h2 id={`${id}-title`} className="sr-only">
+    <dialog
+      ref={ref}
+      aria-labelledby={`${id}-title`}
+      data-testid="settings"
+      onKeyDown={(e) => e.key === 'Escape' && onClose()}
+      onClose={onClose}
+      className="settings-panel fixed z-20 m-0 flex-col overflow-y-auto border-rule bg-paper p-0 text-ink shadow-[0_0_40px_rgb(0_0_0/0.15)] open:flex print:hidden"
+    >
+    <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-rule bg-paper px-5 py-3">
+      <h2 id={`${id}-title`} tabIndex={-1} className="font-display text-xl font-semibold outline-none">
         Settings
       </h2>
+      <button type="button" onClick={onClose} className="rounded-sm bg-ink px-4 py-1.5 font-display text-paper">
+        Done
+      </button>
+    </div>
+    <div className="flex flex-col gap-4 px-5 py-4">
 
       <div className="flex flex-wrap items-end gap-3">
         <div className={`flex flex-col gap-1 ${hidden ? 'hidden' : ''}`}>
@@ -258,9 +267,19 @@ export function YourDetails(props: Props) {
         {source.attribution}. <a className="underline" href={source.url}>ONS {source.edition} life tables</a>.
         Averages describe groups of people, not any one person.
       </p>
-    </section>
-    </details>
+
+      <div className="flex flex-col gap-1 border-t border-rule pt-4">
+        <button
+          type="button"
+          onClick={onForget}
+          className="self-start text-sm text-error underline decoration-rule underline-offset-4"
+        >
+          Forget me
+        </button>
+        <p className="text-xs text-ink-soft">Deletes your date of birth and your story from this browser.</p>
+      </div>
     </div>
+    </dialog>
   )
 }
 

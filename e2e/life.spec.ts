@@ -24,14 +24,14 @@ async function enterBirthDate(page: Page, day: string, month: string, year: stri
 test('entering a date of birth fills the weeks lived, and it is remembered', async ({ page }) => {
   await page.goto('./')
   await expect(example(page)).toBeVisible()
-  await expect(page.getByTestId('summary')).toHaveText('Sam has lived 1,905 weeks, of the 5,200 on a 100-year grid.')
+  await expect(page.getByTestId('summary')).toHaveText('Sam has lived 1,905 weeks of the 5,200 on a 100-year grid.')
   await expect(page.locator('[data-state="lived"]')).toHaveCount(EXAMPLE_LIVED)
   expect(await page.evaluate(() => localStorage.getItem('your-life'))).toBeNull()
 
   await enterBirthDate(page, '15', 'June', '1990')
 
   await expect(example(page)).toBeHidden()
-  await expect(page.getByTestId('summary')).toHaveText("You've lived 1,891 weeks, of the 5,200 on a 100-year grid.")
+  await expect(page.getByTestId('summary')).toHaveText("You've lived 1,891 weeks of the 5,200 on a 100-year grid.")
   await expect(page.locator('[data-state="lived"]')).toHaveCount(LIVED)
   await expect(page.locator('[data-state="today"]')).toHaveAttribute('data-index', String(LIVED))
 
@@ -50,6 +50,7 @@ test('an impossible date is explained and not used', async ({ page }) => {
 test('forgetting the date clears the grid and the saved copy', async ({ page }) => {
   await page.goto('./')
   await enterBirthDate(page, '15', 'June', '1990')
+  await openSettings(page)
   await page.getByRole('button', { name: 'Forget me' }).click()
   await expect(example(page)).toBeVisible()
   await page.reload()
@@ -90,6 +91,7 @@ test('forgetting a date carried over from the old site sticks', async ({ page })
   })
   await page.goto('./')
   await expect(page.locator('[data-state="lived"]')).toHaveCount(LIVED)
+  await openSettings(page)
   await page.getByRole('button', { name: 'Forget me' }).click()
   await page.reload()
   await expect(page.getByLabel('Year', { exact: true })).toHaveValue('')
@@ -169,7 +171,7 @@ test('years, months and weeks views, each with today marked, remembered in the a
   await page.getByRole('radio', { name: 'Months' }).check({ force: true })
   await expect(page).toHaveURL(/\?view=months$/)
   await expect(page.getByRole('grid')).toHaveAccessibleName('Your life in months: three years per row. 436 of 1,200 months lived.')
-  await expect(page.getByTestId('summary')).toHaveText("You've lived 436 months, of the 1,200 on a 100-year grid.")
+  await expect(page.getByTestId('summary')).toHaveText("You've lived 436 months of the 1,200 on a 100-year grid.")
   await expect(page.locator('[data-state="lived"]')).toHaveCount(436)
   await expect(page.locator('[data-state="today"]')).toHaveAccessibleName(
     'Month 437 of 1,200. Age 36, month 5: 15 Oct 2026 to 14 Nov 2026, this month',
@@ -236,7 +238,7 @@ test('the grid length comes from ONS life tables, and can be set by hand', async
   // A hand-set length sticks, and can be undone.
   await years.fill('90')
   await years.press('Enter')
-  await expect(summary).toHaveText("You've lived 1,891 weeks, of the 4,680 on a 90-year grid.")
+  await expect(summary).toHaveText("You've lived 1,891 weeks of the 4,680 on a 90-year grid.")
   await expect(page.locator('[role="gridcell"]')).toHaveCount(90 * 52)
   await page.reload()
   await openSettings(page)

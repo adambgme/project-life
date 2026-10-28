@@ -14,10 +14,13 @@ export const test = base.extend<{ pageErrors: string[] }>({
   ],
 })
 
-/** Open the folded Settings panel (sex, nation, grid length, death rates, statistics). */
+/** Open the Settings panel (sex, nation, grid length, death rates, statistics, forgetting) from the header. */
 export async function openSettings(page: import('@playwright/test').Page) {
   const settings = page.getByTestId('settings')
-  if (!(await settings.evaluate((el) => (el as HTMLDetailsElement).open))) await settings.locator('summary').click()
+  if (!(await settings.evaluate((el) => (el as HTMLDialogElement).open))) {
+    await page.getByRole('banner').getByRole('button', { name: 'Settings' }).click()
+  }
+  await expect(settings).toBeVisible()
 }
 
 export { expect }

@@ -7,11 +7,11 @@ import { ViewToggle } from './components/ViewToggle'
 import { Legend } from './components/Legend'
 import { LifeBar } from './components/LifeBar'
 import { StoryPanel, type PanelMode } from './components/StoryPanel'
-import { YourDetails } from './components/YourDetails'
+import { Settings, settingsSummary } from './components/Settings'
 import { EXAMPLE } from './life/example'
 import { BOXES_PER_YEAR, boxIndex, calendarDateIn, type View } from './life/lifeMaths'
 import { chanceOfReaching, lifeProgress, outlook, suggestedGridYears } from './life/mortality'
-import { CLASSIC_GRID_YEARS, emptyLife, MIN_GRID_YEARS, newProfile } from './life/store'
+import { CLASSIC_GRID_YEARS, emptyLife, MIN_GRID_YEARS, NATION_NAMES, newProfile } from './life/store'
 import { categoryColour, countdown, goalDate, layoutStory, weeksToGo, type Category } from './life/story'
 import { useLife } from './life/useLife'
 import { useMortality } from './life/useMortality'
@@ -46,6 +46,13 @@ export function App() {
   const [panel, setPanel] = useState<PanelMode | null>(null)
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null)
   const [sharing, setSharing] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  // Settings sits beside the page; the story panel and print dialog cover it, so they never open together.
+  useEffect(() => {
+    if (panel || sharing) setSettingsOpen(false)
+  }, [panel, sharing])
+  // The date form starts afresh after forgetting.
+  const [formKey, setFormKey] = useState(0)
 
   // A "send to my phone" link, on load or opened into a tab that already has the page: offer its contents.
   useEffect(() => {
@@ -118,7 +125,9 @@ export function App() {
       return false
     }
     setPanel(null)
+    setSettingsOpen(false)
     setLife(emptyLife)
+    setFormKey((key) => key + 1)
     return true
   }
 
@@ -157,7 +166,9 @@ export function App() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-8 px-4 py-8 sm:px-8 sm:py-12 print:min-h-0 print:max-w-none print:gap-3 print:p-0">
+    <div
+      className={`mx-auto flex min-h-dvh max-w-3xl flex-col lg:max-w-6xl gap-8 px-4 py-8 sm:px-8 sm:py-12 print:min-h-0 print:max-w-none print:gap-3 print:p-0 ${settingsOpen ? 'xl:mr-[26rem]' : ''}`}
+    >
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-4" data-print-part>
         <div>
           <p className="font-display text-xs tracking-[0.2em] text-ink-soft uppercase">
@@ -165,10 +176,41 @@ export function App() {
           </p>
           <h1 className="font-display text-5xl font-semibold tracking-tight sm:text-6xl">Your Life</h1>
         </div>
-        <div className="print:hidden">
+        <div className="flex items-center gap-2 print:hidden">
           <ViewToggle view={view} onChange={changeView} />
+          {life.profile && (
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(!settingsOpen)}
+              aria-expanded={settingsOpen}
+              className="flex items-center gap-1.5 rounded-sm border border-ink px-3 py-1 font-display text-sm tracking-wide hover:bg-paper-deep"
+            >
+              <svg aria-hidden viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M2 4h7M13 4h1M2 12h1M7 12h7" />
+                <circle cx="11" cy="4" r="2" />
+                <circle cx="5" cy="12" r="2" />
+              </svg>
+              Settings
+            </button>
+          )}
         </div>
       </header>
+
+      {life.profile && (
+        <Settings
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          onForget={forget}
+          profile={life.profile}
+          suggestedYears={suggestedYears}
+          gridYears={gridYears}
+          minYears={Math.max(MIN_GRID_YEARS, personal.fromAge + 1)}
+          lifeExpectancy={personal.lifeExpectancy}
+          chanceAtEnd={chanceOfReaching(personal, gridYears)}
+          source={mortality.source}
+          onChange={(next) => setLife({ ...life, profile: next })}
+        />
+      )}
 
       {!storageAvailable && (
         <p role="status" className="border-l-2 border-today bg-paper-deep px-3 py-2 text-sm print:hidden">
@@ -181,13 +223,13 @@ export function App() {
       <main className="flex flex-col gap-6 print:gap-3">
         <div className="print:hidden">
         <BirthDateForm
+          key={formKey}
           birthDate={life.profile?.birthDate ?? null}
           today={today}
+          legend={life.profile ? 'Your date of birth' : `This is ${EXAMPLE.name}'s life. See yours:`}
           onChange={(date) =>
             setLife({ ...life, profile: date ? { ...(life.profile ?? newProfile(date)), birthDate: date } : null })
           }
-          canForget={!!life.profile || waitingForDate}
-          onForget={forget}
         />
         </div>
         {!life.profile && (
@@ -196,20 +238,20 @@ export function App() {
             <ImportButton className="underline decoration-rule underline-offset-4 hover:text-ink" onPending={setPendingImport} />
           </p>
         )}
-        {life.profile && (
-          <div className="print:hidden">
-          <YourDetails
-            profile={life.profile}
-            suggestedYears={suggestedYears}
-            gridYears={gridYears}
-            minYears={Math.max(MIN_GRID_YEARS, personal.fromAge + 1)}
-            tablesStatus={mortalityStatus}
-            lifeExpectancy={personal.lifeExpectancy}
-            chanceAtEnd={chanceOfReaching(personal, gridYears)}
-            source={mortality.source}
-            onChange={(next) => setLife({ ...life, profile: next })}
-          />
-          </div>
+        {life.profile && mortalityStatus !== 'ready' && (
+          <p role="status" className="border-l-2 border-today bg-paper-deep px-3 py-2 text-sm print:hidden">
+            {mortalityStatus === 'loading'
+              ? `Loading the figures for ${NATION_NAMES[life.profile.nation]}; showing the UK's meanwhile.`
+              : `The figures for ${NATION_NAMES[life.profile.nation]} couldn't be loaded, so these are the UK's. Try reloading the page.`}
+          </p>
+        )}
+        {waitingForDate && (
+          <p className="text-sm text-ink-soft">
+            Want to start again?{' '}
+            <button type="button" onClick={forget} className="underline decoration-rule underline-offset-4 hover:text-ink">
+              Forget me
+            </button>
+          </p>
         )}
         {waitingForDate ? (
           <p role="status" className="border-l-2 border-accent bg-paper-deep px-3 py-2" data-testid="waiting">
@@ -218,16 +260,25 @@ export function App() {
           </p>
         ) : (
         <>
+        {/* On wide screens the grid takes the right and the summary stays beside it on the left; on phones and paper
+            they stack. */}
+        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start lg:gap-x-12 print:flex print:gap-3">
+        <div className="flex flex-col gap-6 lg:sticky lg:top-8 print:static print:gap-3">
         <div className="flex flex-col gap-1" data-print-part>
           {isExample && (
             <p className="font-display text-sm tracking-[0.12em] text-today uppercase" data-testid="example">
               An example: {EXAMPLE.name}'s life
             </p>
           )}
-          <p className="font-display text-xl" aria-live="polite" data-testid="summary">
-            {isExample ? `${EXAMPLE.name} has` : "You've"} lived{' '}
-            <strong className="font-semibold">{lived.toLocaleString('en-GB')}</strong> {UNIT[view]}
-            <span className="text-ink-soft">, of the {total} on a {gridYears}-year grid.</span>
+          {/* The headline: who, then the number large, then what it's out of. One line each on screen; one line in all on
+              the poster. */}
+          <p className="flex flex-col font-display leading-none poster:block poster:text-xl" aria-live="polite" data-testid="summary">
+            <span className="text-lg text-ink-soft poster:text-xl poster:text-ink">{isExample ? `${EXAMPLE.name} has` : "You've"} lived</span>{' '}
+            <span className="py-1 text-4xl sm:text-5xl lg:text-4xl poster:p-0 poster:text-xl">
+              <strong className="text-5xl font-semibold tracking-tight tabular-nums sm:text-7xl lg:text-6xl poster:text-xl">{lived.toLocaleString('en-GB')}</strong>{' '}
+              {UNIT[view]}
+            </span>{' '}
+            <span className="text-lg text-ink-soft poster:text-xl">of the {total} on a {gridYears}-year grid.</span>
           </p>
           {profile.statistics !== 'hidden' && (
             <LifeBar
@@ -242,24 +293,39 @@ export function App() {
             </p>
           )}
           {isExample && (
-            <p className="text-sm text-ink-soft">Enter your date of birth above to see your own. Nothing is saved until you do.</p>
+            <p className="text-sm text-ink-soft">
+              Nothing is saved until you enter your date of birth. On your own grid you can tap any box to add an era, a
+              moment or a goal.
+            </p>
           )}
         </div>
-        {profile.statistics !== 'hidden' && (
-          <a href="#figures" className="-mt-3 self-start text-sm text-ink-soft underline decoration-rule underline-offset-4 hover:text-ink print:hidden">
-            See {isExample ? `${EXAMPLE.name}'s` : 'your'} figures below ↓
-          </a>
-        )}
+        <div className="-mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink-soft print:hidden">
+          {life.profile && (
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="text-left underline decoration-rule underline-offset-4 hover:text-ink"
+              data-testid="settings-summary"
+            >
+              {settingsSummary(life.profile, gridYears)} · Change
+            </button>
+          )}
+          {profile.statistics !== 'hidden' && (
+            <a href="#figures" className="underline decoration-rule underline-offset-4 hover:text-ink">
+              See {isExample ? `${EXAMPLE.name}'s` : 'your'} figures below ↓
+            </a>
+          )}
+        </div>
         {!isExample && (
           <div className="flex flex-wrap items-center gap-3 print:hidden">
             <button
               type="button"
               onClick={() => setPanel({ kind: 'list' })}
-              className="rounded-sm bg-ink px-4 py-2 font-display text-paper"
+              className="rounded-sm bg-ink px-3 py-1.5 font-display text-sm text-paper"
             >
               Your story
             </button>
-            <button type="button" onClick={() => setSharing(true)} className="rounded-sm border border-ink px-4 py-2 font-display">
+            <button type="button" onClick={() => setSharing(true)} className="rounded-sm border border-ink px-3 py-1.5 font-display text-sm">
               Print or share
             </button>
             <span className="text-sm text-ink-soft">
@@ -276,6 +342,8 @@ export function App() {
           </div>
         )}
         {/* A new view fades in rather than jumping (styles.css). */}
+        </div>
+        <div className="flex flex-col gap-6 print:gap-3">
         <div key={view} className="flex justify-center" data-grid-frame>
           <LifeGrid
             view={view}
@@ -293,6 +361,8 @@ export function App() {
           />
         </div>
         <Legend eras={shown.eras} moments={shown.moments} goals={shown.goals} colours={colours} chances={!!chances} patterns={!isExample && profile.patterns} />
+        </div>
+        </div>
         {profile.statistics !== 'hidden' && <Figures profile={profile} today={today} isExample={isExample} />}
         </>
         )}

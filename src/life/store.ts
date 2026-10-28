@@ -9,6 +9,14 @@ import type { Basis, Sex } from './mortality'
 import { CATEGORIES, type Category, type Era, type Goal, type Moment } from './story'
 
 export const NATIONS = ['uk', 'england', 'wales', 'scotland', 'northern-ireland'] as const
+
+export const NATION_NAMES: Record<Nation, string> = {
+  uk: 'United Kingdom',
+  england: 'England',
+  wales: 'Wales',
+  scotland: 'Scotland',
+  'northern-ireland': 'Northern Ireland',
+}
 export type Nation = (typeof NATIONS)[number]
 
 export type Profile = {

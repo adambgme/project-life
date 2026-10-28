@@ -19,9 +19,12 @@ type Props = {
  * labels and gaps are fixed sizes, so its height isn't proportional to its width: measure it at trial widths. */
 export function printPoster(paper: Paper) {
   const figure = document.querySelector<HTMLElement>('[data-testid="grid-figure"]')
-  // Everything else that prints (title, summary, key) is measured too; the print gap between parts is 12px.
+  // Everything else that prints (title, summary, key) is measured too, in its printed sizes (the `poster:` styles);
+  // the print gap between parts is 12px.
+  document.documentElement.dataset.printMeasure = ''
   const parts = [...document.querySelectorAll<HTMLElement>('[data-print-part]')]
   const others = parts.reduce((sum, el) => sum + el.getBoundingClientRect().height + 12, 0)
+  delete document.documentElement.dataset.printMeasure
   const available = PAGE_HEIGHT_MM[paper] * PX_PER_MM - others - 24
   let width = PAGE_WIDTH_MM[paper] * PX_PER_MM
   if (figure) {
