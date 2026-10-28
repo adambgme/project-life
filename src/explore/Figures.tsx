@@ -3,11 +3,12 @@ import type { CalendarDate } from '../life/lifeMaths'
 import { chanceWords } from '../life/gridChances'
 import { chanceOfReaching, deathRate, outlook, type MortalityData } from '../life/mortality'
 import { NATION_NAMES, NATIONS, type Nation, type Profile } from '../life/store'
+import { deprivationOutlook } from '../life/deprivation'
 import { loadNation, useMortality } from '../life/useMortality'
 import { CausesSection } from './CausesSection'
-import { CountrySection } from './CountrySection'
-import { DeprivationSection } from './DeprivationSection'
-import { DotRows } from './DotRows'
+import { CountryPicker, CountrySection, useCountryCompare } from './CountrySection'
+import { AreaPicker, DeprivationSection, groupName } from './DeprivationSection'
+import { PlaceStrip, type PlaceGroup } from './PlaceStrip'
 import { longDate } from './format'
 import { LineChart, type Point } from './LineChart'
 import { OddsChapter } from './OddsChapter'
@@ -70,11 +71,72 @@ export function Figures({ profile, today, isExample }: Props) {
     }
   }, [profile.birthDate, profile.sex, profile.basis, today])
 
+  // Same birth year, different place: the nations (above), neighbourhoods and another country, on one scale.
+  const deprivation = deprivationOutlook(profile.nation, profile.sex, from)
+  const [mine, setMine] = useState<number | null>(null)
+  const myArea = mine !== null && mine <= deprivation.groups.length ? mine : null
+  const [country, setCountry] = useState('')
+  const compare = useCountryCompare(country, profile.birthDate, today, options)
+
   const who = isExample ? 'people like Sam' : 'people like you'
   const sexWords = profile.sex === 'both' ? 'both sexes averaged' : `${profile.sex}s`
   const section = 'flex flex-col gap-3 border-t border-rule pt-5'
   const h3 = 'font-display text-2xl'
   const source = `${data.source.attribution}. ${data.source.edition} life tables, released ${longDate(data.source.released)}.`
+
+  const places: PlaceGroup[] = [
+    {
+      key: 'nations',
+      title: 'Across the UK (ONS)',
+      label: 'Average age at death by nation',
+      rows: [...(nations ?? [])]
+        .sort((a, b) => b.expectancy - a.expectancy)
+        .map(({ nation, expectancy }) => ({
+          key: nation,
+          label: NATION_NAMES[nation],
+          value: expectancy,
+          chosen: nation === profile.nation,
+          chosenWords: 'where you live',
+        })),
+    },
+    {
+      key: 'deprivation',
+      title: `Neighbourhoods in ${deprivation.area}, ${deprivation.period} (ONS)`,
+      label: `Average age at death for ${who} by area deprivation, ${deprivation.area}`,
+      rows: deprivation.groups.map((g) => ({
+        key: String(g.group),
+        label: groupName(deprivation, g.group, true),
+        value: g.ageAtDeath,
+        chosen: g.group === myArea,
+        chosenWords: 'your area',
+      })),
+    },
+    {
+      key: 'countries',
+      title: 'Other countries (UN)',
+      label: 'Average age at death by country of residence, on the UN figures',
+      rows: compare.ready
+        ? compare.outlooks.map((o, i) => ({
+            key: compare.columns[i]!,
+            label: compare.names[i]!,
+            value: o.lifeExpectancy,
+            chosen: i > 0,
+            chosenWords: 'the country you chose',
+          }))
+        : [],
+    },
+  ]
+  const spread = (group: PlaceGroup) => {
+    const values = group.rows.map((r) => r.value)
+    return values.length > 1 ? Math.max(...values) - Math.min(...values) : 0
+  }
+  const [nationGap, areaGap] = [spread(places[0]!), spread(places[1]!)]
+  const gap =
+    nationGap > 0 && areaGap > 0
+      ? areaGap > nationGap
+        ? `The widest gap is between neighbourhoods: ${areaGap.toFixed(1)} years from the most to the least deprived ${deprivation.unit}, against ${nationGap.toFixed(1)} across the UK's nations.`
+        : `The widest gap is across the UK's nations: ${nationGap.toFixed(1)} years, against ${areaGap.toFixed(1)} between the most and least deprived neighbourhoods.`
+      : null
 
   return (
     <section id="figures" aria-labelledby="figures-title" className="flex max-w-3xl scroll-mt-4 flex-col gap-8 border-t border-ink pt-6 print:hidden">
@@ -199,46 +261,36 @@ export function Figures({ profile, today, isExample }: Props) {
           <CausesSection age={from} sex={profile.sex} outsideEnglandWales={profile.nation === 'scotland' || profile.nation === 'northern-ireland'} />
         </section>
 
-        <section className={section} aria-labelledby="nations-title" data-reveal>
-          <h3 id="nations-title" className={h3}>
-            Across the UK
+        <section className={section} aria-labelledby="places-title" data-reveal>
+          <h3 id="places-title" className={h3}>
+            Same birth year, different place
           </h3>
-          <p>Average age at death for {who}, by where in the UK they live.</p>
-          {nations === null ? (
-            <p className="text-sm text-ink-soft">Loading the four nations' figures…</p>
-          ) : nations.length === 0 ? (
+          <p>
+            The average age at death for {who}, depending on where they live: which part of the UK, how deprived the
+            neighbourhood, and, if you choose one, another country. Every group sits on the same scale, so the size of each
+            gap can be compared. Each group comes from its own source, so compare within a group.
+          </p>
+          <div className="flex flex-wrap gap-4">
+            <AreaPicker outlook={deprivation} mine={myArea} onPick={setMine} />
+            <CountryPicker chosen={country} onChoose={setCountry} />
+          </div>
+          {nations === null && <p className="text-sm text-ink-soft">Loading the four nations' figures…</p>}
+          {nations?.length === 0 && (
             <p role="status" className="text-sm">The nations' figures couldn't be loaded. Try reloading the page.</p>
-          ) : (
-            <DotRows
-              label="Average age at death by nation"
-              testId="nations"
-              rows={[...nations]
-                .sort((a, b) => b.expectancy - a.expectancy)
-                .map(({ nation, expectancy }) => ({
-                  key: nation,
-                  label: NATION_NAMES[nation],
-                  value: expectancy,
-                  chosen: nation === profile.nation,
-                  chosenWords: 'where you live',
-                }))}
-            />
           )}
-          <p className="text-xs text-ink-soft">{source}</p>
-        </section>
+          <PlaceStrip groups={places} />
+          {gap && <p data-testid="widest-gap">{gap}</p>}
 
-        <section className={section} aria-labelledby="deprivation-title" data-reveal>
-          <h3 id="deprivation-title" className={h3}>
-            Rich and poor neighbourhoods
-          </h3>
-          <DeprivationSection nation={profile.nation} sex={profile.sex} age={from} who={who} />
-        </section>
+          <h4 className="mt-4 font-display text-xl">Neighbourhoods</h4>
+          <DeprivationSection outlook={deprivation} nation={profile.nation} sex={profile.sex} age={from} />
 
-        <section className={section} aria-labelledby="country-title" data-reveal>
-          <h3 id="country-title" className={h3}>
-            If you lived in another country
-          </h3>
-          <p>How the outlook for {who} would compare if they lived somewhere else.</p>
-          <CountrySection birthDate={profile.birthDate} today={today} options={options} who={who} />
+          <h4 className="mt-4 font-display text-xl">If you lived in another country</h4>
+          {country === '' ? (
+            <p className="text-sm text-ink-soft">Choose a country above to compare its survival curve with the UK's.</p>
+          ) : (
+            <CountrySection compare={compare} today={today} options={options} who={who} />
+          )}
+          <p className="text-xs text-ink-soft">UK nations: {source}</p>
         </section>
       </div>
     </section>

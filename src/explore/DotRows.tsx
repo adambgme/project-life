@@ -1,11 +1,11 @@
 export type DotRow = { key: string; label: string; value: number; chosen?: boolean; chosenWords?: string }
 
 /** A dot plot on a shared scale, one row each. A chosen row has a filled, larger dot and a bold label, so colour isn't
- * needed to tell it apart. Every dot is labelled with its value. */
-export function DotRows({ rows, label, testId }: { rows: DotRow[]; label: string; testId?: string }) {
+ * needed to tell it apart. Every dot is labelled with its value. `domain` sets the scale (to share it with other
+ * plots); otherwise it fits these rows. */
+export function DotRows({ rows, label, testId, domain }: { rows: DotRow[]; label: string; testId?: string; domain?: [number, number] }) {
   const values = rows.map((r) => r.value)
-  const min = Math.floor(Math.min(...values) - 1)
-  const max = Math.ceil(Math.max(...values) + 1)
+  const [min, max] = domain ?? [Math.floor(Math.min(...values) - 1), Math.ceil(Math.max(...values) + 1)]
   const at = (v: number) => `${((v - min) / (max - min)) * 100}%`
   return (
     <ul className="flex flex-col gap-3" aria-label={label} data-testid={testId}>
