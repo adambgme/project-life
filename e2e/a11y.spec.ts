@@ -113,10 +113,14 @@ test('the whole page works from the keyboard, with a visible focus ring at every
     expect(stop.visible, `no visible focus on ${stop.text}`).toBe(true)
     stops.push(stop.text)
   }
-  // In reading order: date of birth, Settings, the story and sharing buttons, the grid (one stop), then the figures.
+  // In reading order: the header's Settings button, date of birth, the line of settings under the life bar, the story
+  // and sharing buttons, the grid (one stop), then the figures. The closed Settings panel has no stops.
   const at = (pattern: RegExp) => stops.findIndex((s) => pattern.test(s))
-  expect(at(/^input/)).toBeLessThan(at(/^summary/))
-  expect(at(/^summary/)).toBeLessThan(at(/Your story/))
+  expect(at(/^button Settings$/)).toBeGreaterThanOrEqual(0)
+  expect(at(/^button Settings$/)).toBeLessThan(at(/^select Month/))
+  expect(at(/^select Month/)).toBeLessThan(at(/^button .* · /))
+  expect(at(/^button .* · /)).toBeLessThan(at(/Your story/))
+  expect(at(/^button Done$/)).toBe(-1)
   expect(at(/Your story/)).toBeLessThan(at(/^div Week/))
   expect(at(/^div Week/)).toBeLessThan(at(/^svg Survival curve/))
   expect(stops.filter((s) => s.startsWith('div Week'))).toHaveLength(1)
@@ -130,6 +134,6 @@ test('the whole page works from the keyboard, with a visible focus ring at every
 test('reduced motion turns animations off', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await seed(page)
-  const chevron = page.getByTestId('settings').locator('summary span[aria-hidden]')
-  expect(await chevron.evaluate((el) => getComputedStyle(el).transitionDuration)).toMatch(/^0s/)
+  await openSettings(page)
+  expect(await page.getByTestId('settings').evaluate((el) => getComputedStyle(el).transitionDuration)).toMatch(/^0s/)
 })

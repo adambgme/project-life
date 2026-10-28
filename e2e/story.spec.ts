@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { expect, test } from './fixtures'
+import { expect, openSettings, test } from './fixtures'
 
 // 26 Oct 2026; born 15 Jun 1990. Box numbers are weeks counted from birth, 52 per year of age.
 const NOW = new Date('2026-10-26T12:00:00Z')
@@ -135,6 +135,7 @@ test('"Forget me" deletes the story too, after asking', async ({ page }) => {
   await addEra(page, 1000, 'University', 'Education', '2008-09-20', '2011-06-30')
 
   page.once('dialog', (d) => d.dismiss())
+  await openSettings(page)
   await page.getByRole('button', { name: 'Forget me' }).click()
   await expect(page.locator('[data-eras]')).toHaveCount(146)
 

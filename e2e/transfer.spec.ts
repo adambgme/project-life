@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
-import { expect, test } from './fixtures'
+import { expect, openSettings, test } from './fixtures'
 
 const NOW = new Date('2026-10-26T12:00:00Z')
 const dialog = (page: Page) => page.getByRole('dialog')
@@ -34,6 +34,7 @@ test('export a backup, forget everything, and bring it back from the file', asyn
   await dialog(page).getByRole('button', { name: 'Close' }).click()
 
   page.once('dialog', (d) => d.accept())
+  await openSettings(page)
   await page.getByRole('button', { name: 'Forget me' }).click()
   await expect(page.getByTestId('example')).toBeVisible()
 

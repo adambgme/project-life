@@ -10,10 +10,8 @@ type Props = {
   birthDate: CalendarDate | null
   today: CalendarDate
   onChange: (birthDate: CalendarDate | null) => void
-  /** Whether there's anything saved to forget. */
-  canForget: boolean
-  /** Delete everything saved in this browser; returns false if the person changed their mind. */
-  onForget: () => boolean
+  /** The words before the fields, e.g. "This is Sam's life. See yours:". */
+  legend: string
 }
 
 type Fields = { day: string; month: string; year: string }
@@ -33,7 +31,7 @@ function check(fields: Fields, today: CalendarDate): { date: CalendarDate } | { 
 
 /** Date of birth in UK order (day, month, year). The grid follows the form: a complete, valid date is saved, and
  * anything else (incomplete, impossible or empty) clears it, so the grid never shows a date the form doesn't. */
-export function BirthDateForm({ birthDate, today, onChange, canForget, onForget }: Props) {
+export function BirthDateForm({ birthDate, today, onChange, legend }: Props) {
   const id = useId()
   const [fields, setFields] = useState(() => fieldsFrom(birthDate))
   const result = check(fields, today)
@@ -46,21 +44,17 @@ export function BirthDateForm({ birthDate, today, onChange, canForget, onForget 
     onChange(checked && 'date' in checked ? checked.date : null)
   }
 
-  function forget() {
-    if (onForget()) setFields(fieldsFrom(null))
-  }
-
   const input =
-    'rounded-sm border border-rule bg-paper px-2 py-1.5 text-lg text-ink tabular-nums shadow-[inset_0_1px_0_rgb(0_0_0/0.04)] focus:border-ink'
+    'rounded-sm border border-rule bg-paper px-2 py-1 text-base text-ink tabular-nums shadow-[inset_0_1px_0_rgb(0_0_0/0.04)] focus:border-ink'
 
   return (
     <form className="flex flex-col gap-2" onSubmit={(e) => e.preventDefault()} noValidate>
-      <fieldset className="flex flex-wrap items-end gap-3" aria-describedby={error ? `${id}-error` : undefined}>
-        <legend className="mb-2 font-display text-sm tracking-[0.12em] text-ink-soft uppercase">
-          Your date of birth
+      <fieldset className="flex flex-wrap items-end gap-x-3 gap-y-2" aria-describedby={error ? `${id}-error` : undefined}>
+        <legend className="mb-1 font-display text-base text-ink-soft">
+          {legend}
         </legend>
         <div className="flex flex-col gap-1">
-          <label htmlFor={`${id}-day`} className="text-sm text-ink-soft">
+          <label htmlFor={`${id}-day`} className="text-xs text-ink-soft">
             Day
           </label>
           <input
@@ -76,12 +70,12 @@ export function BirthDateForm({ birthDate, today, onChange, canForget, onForget 
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor={`${id}-month`} className="text-sm text-ink-soft">
+          <label htmlFor={`${id}-month`} className="text-xs text-ink-soft">
             Month
           </label>
           <select
             id={`${id}-month`}
-            className={`${input} w-40`}
+            className={`${input} w-36`}
             autoComplete="bday-month"
             value={fields.month}
             onChange={(e) => update('month', e.target.value)}
@@ -98,7 +92,7 @@ export function BirthDateForm({ birthDate, today, onChange, canForget, onForget 
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor={`${id}-year`} className="text-sm text-ink-soft">
+          <label htmlFor={`${id}-year`} className="text-xs text-ink-soft">
             Year
           </label>
           <input
@@ -113,15 +107,6 @@ export function BirthDateForm({ birthDate, today, onChange, canForget, onForget 
             aria-invalid={!!error}
           />
         </div>
-        {canForget && (
-          <button
-            type="button"
-            onClick={forget}
-            className="pb-2 text-sm text-ink-soft underline decoration-rule underline-offset-4 hover:text-ink"
-          >
-            Forget me
-          </button>
-        )}
       </fieldset>
       <p id={`${id}-error`} className="text-sm text-error" role="alert">
         {error}

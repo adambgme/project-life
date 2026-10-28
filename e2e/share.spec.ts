@@ -81,6 +81,8 @@ test('with patterns on eras, the share image draws them too', async ({ page }) =
   await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click()
   await openSettings(page)
   await page.getByRole('checkbox', { name: /Patterns on eras/ }).check()
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('settings')).toBeHidden()
   const textured = await saveImage(page, true)
   expect([textured.width, textured.height]).toEqual([plain.width, plain.height])
   expect(textured.png.equals(plain.png)).toBe(false)

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { CalendarDate } from '../life/lifeMaths'
 import { chanceWords } from '../life/gridChances'
 import { ageAtChance, chanceOfReaching, deathRate, outlook, type MortalityData } from '../life/mortality'
-import { NATIONS, type Nation, type Profile } from '../life/store'
+import { NATION_NAMES, NATIONS, type Nation, type Profile } from '../life/store'
 import { loadNation, useMortality } from '../life/useMortality'
 import { CausesSection } from './CausesSection'
 import { CountrySection } from './CountrySection'
@@ -10,14 +10,6 @@ import { DeprivationSection } from './DeprivationSection'
 import { DotRows } from './DotRows'
 import { longDate } from './format'
 import { LineChart, type Point } from './LineChart'
-
-const NATION_NAMES: Record<Nation, string> = {
-  uk: 'United Kingdom',
-  england: 'England',
-  wales: 'Wales',
-  scotland: 'Scotland',
-  'northern-ireland': 'Northern Ireland',
-}
 
 type Props = { profile: Profile; today: CalendarDate; isExample: boolean }
 
@@ -30,7 +22,7 @@ export function oneIn(q: number): string {
 }
 
 /** "Your figures", below the grid: the whole statistical picture for people like you, gently, with every source
- * shown. The choices behind it (sex, nation, cohort or period) live in Settings. */
+ * shown. The choices behind it (sex, nation, cohort or period) are in Settings. */
 export function Figures({ profile, today, isExample }: Props) {
   const { data, status } = useMortality(profile.nation)
   // Until a nation's tables arrive (or if they can't), the figures are the UK's: say so, never label them otherwise.
@@ -83,7 +75,7 @@ export function Figures({ profile, today, isExample }: Props) {
   const source = `${data.source.attribution}. ${data.source.edition} life tables, released ${longDate(data.source.released)}.`
 
   return (
-    <section id="figures" aria-labelledby="figures-title" className="flex scroll-mt-4 flex-col gap-8 border-t border-ink pt-6 print:hidden">
+    <section id="figures" aria-labelledby="figures-title" className="flex max-w-3xl scroll-mt-4 flex-col gap-8 border-t border-ink pt-6 print:hidden">
       <header className="flex flex-col gap-2">
         <p className="font-display text-xs tracking-[0.2em] text-ink-soft uppercase">How long people live</p>
         <h2 id="figures-title" className="font-display text-4xl font-semibold tracking-tight">
@@ -106,12 +98,12 @@ export function Figures({ profile, today, isExample }: Props) {
         <p className="text-sm text-ink-soft">
           Figures for {who}: born {profile.birthDate.year}, {sexWords}, living in {NATION_NAMES[shownNation]}, aged{' '}
           {from} today, using {profile.basis === 'cohort' ? 'projected (cohort)' : "this year's (period)"} death rates.
-          Change these in Settings.
+          {!isExample && 'Change these in Settings.'}
         </p>
 
         <section className={section} aria-labelledby="survival-title" data-reveal>
           <h3 id="survival-title" className={h3}>
-            Your survival curve
+            {isExample ? "Sam's survival curve" : 'Your survival curve'}
           </h3>
           <p>
             Of 100 {who} alive at {from} today, how many are still alive at each later age. On average they live to about{' '}
@@ -193,7 +185,7 @@ export function Figures({ profile, today, isExample }: Props) {
 
         <section className={section} aria-labelledby="causes-title">
           <h3 id="causes-title" className={h3}>
-            What people your age most often die of
+            What people {isExample ? "Sam's" : 'your'} age most often die of
           </h3>
           <p className="text-sm text-ink-soft">
             At younger ages deaths are rare and often sudden; later on, long illnesses take over. Choose an age to see how
