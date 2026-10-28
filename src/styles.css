@@ -137,6 +137,16 @@ body {
     opacity: 0;
   }
 }
+@keyframes draw {
+  from {
+    stroke-dasharray: 1 1;
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dasharray: 1 1;
+    stroke-dashoffset: 0;
+  }
+}
 @keyframes fill {
   from {
     scale: 0 1;
@@ -150,6 +160,13 @@ body {
       animation: rise linear both;
       animation-timeline: view();
       animation-range: entry 0px entry 160px;
+    }
+    /* A chart's line draws itself as the chart comes up the screen, finished once the chart is wholly in view (a sticky
+       chart included). */
+    [data-draw] {
+      animation: draw linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 100%;
     }
   }
   /* The life bar fills to its share as the page opens. */

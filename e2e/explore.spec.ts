@@ -212,3 +212,34 @@ test.describe('a country that cannot be loaded', () => {
     pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !e.includes('Failed to load resource')))
   })
 })
+
+test('your odds, step by step: on a wide screen the chart stays put and picks out the step being read', async ({ page }) => {
+  test.skip(test.info().project.name !== 'desktop', 'Wide screens only; phones get the still chart')
+  await seed(page, PROFILE)
+  const odds = page.getByTestId('odds')
+  await expect(odds).toHaveAttribute('data-mode', 'stepped')
+  const steps = odds.locator('[data-step]')
+  await expect(steps).toHaveCount(4)
+  await expect(steps.first()).toContainText('Of 100 people like you alive at 36 today, about')
+
+  // Each sentence, scrolled to the middle of the screen, moves the chart's highlight to its age.
+  for (const i of [0, 2, 3]) {
+    await steps.nth(i).evaluate((el) => el.scrollIntoView({ block: 'center' }))
+    await expect(steps.nth(i)).toHaveAttribute('aria-current', 'step')
+    const age = (await steps.nth(i).textContent())!.match(/reach (\d+)\./)![1]!
+    await expect(page.getByTestId('chart-highlight')).toHaveAttribute('data-x', age)
+  }
+  // The chart stayed in view throughout.
+  await expect(page.getByRole('img', { name: /Survival curve/ })).toBeInViewport()
+})
+
+test('your odds, still: phones and reduced motion get every step marked, and every sentence', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await seed(page, PROFILE)
+  const odds = page.getByTestId('odds')
+  await expect(odds).toHaveAttribute('data-mode', 'still')
+  await expect(odds.getByRole('listitem')).toHaveCount(4)
+  await expect(odds.getByRole('listitem').nth(2)).toHaveText(/^Half of them reach \d+\./)
+  await expect(page.getByTestId('chart-highlight')).toHaveCount(0)
+  for (const label of ['1 in 2', '1 in 10']) await expect(odds.locator('svg text', { hasText: label })).toHaveCount(1)
+})

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CalendarDate } from '../life/lifeMaths'
 import { chanceWords } from '../life/gridChances'
-import { ageAtChance, chanceOfReaching, deathRate, outlook, type MortalityData } from '../life/mortality'
+import { chanceOfReaching, deathRate, outlook, type MortalityData } from '../life/mortality'
 import { NATION_NAMES, NATIONS, type Nation, type Profile } from '../life/store'
 import { loadNation, useMortality } from '../life/useMortality'
 import { CausesSection } from './CausesSection'
@@ -10,6 +10,8 @@ import { DeprivationSection } from './DeprivationSection'
 import { DotRows } from './DotRows'
 import { longDate } from './format'
 import { LineChart, type Point } from './LineChart'
+import { OddsChapter } from './OddsChapter'
+import { oddsSteps } from './oddsSteps'
 
 type Props = { profile: Profile; today: CalendarDate; isExample: boolean }
 
@@ -103,30 +105,33 @@ export function Figures({ profile, today, isExample }: Props) {
 
         <section className={section} aria-labelledby="survival-title" data-reveal>
           <h3 id="survival-title" className={h3}>
-            {isExample ? "Sam's survival curve" : 'Your survival curve'}
+            {isExample ? "Sam's odds, step by step" : 'Your odds, step by step'}
           </h3>
           <p>
             Of 100 {who} alive at {from} today, how many are still alive at each later age. On average they live to about{' '}
             <strong className="font-semibold">{Math.round(principal.lifeExpectancy)}</strong>. The shaded band runs from
             ONS's low to its high projection.
           </p>
-          <LineChart
-            points={survival}
-            summary={`Survival curve for ${who}: falls from 100% at ${from} to ${percent(chanceOfReaching(principal, from + 10))} at ${from + 10}.`}
-            yDomain={[0, 1]}
-            yTicks={[0, 0.25, 0.5, 0.75, 1]}
-            formatY={percent}
-            xTicks={ticks}
-            xLabel="Age"
-            marks={[
-              { x: Math.round(ageAtChance(principal, 0.5)), label: '1 in 2' },
-              { x: Math.round(ageAtChance(principal, 0.1)), label: '1 in 10' },
-            ]}
-            describe={(p) => ({
-              value: `${percent(p.y)} alive at ${p.x}`,
-              detail: p.lo !== undefined ? `${percent(p.lo)}–${percent(p.hi!)} across ONS projections` : undefined,
-            })}
-            table={{ xHeader: 'Age', yHeader: 'Still alive', every: 5 }}
+          <OddsChapter
+            steps={oddsSteps(principal, who)}
+            chart={({ highlight, marks }) => (
+              <LineChart
+                points={survival}
+                summary={`Survival curve for ${who}: falls from 100% at ${from} to ${percent(chanceOfReaching(principal, from + 10))} at ${from + 10}.`}
+                yDomain={[0, 1]}
+                yTicks={[0, 0.25, 0.5, 0.75, 1]}
+                formatY={percent}
+                xTicks={ticks}
+                xLabel="Age"
+                marks={marks?.map((step) => ({ x: step.age, label: step.short }))}
+                highlight={highlight && { x: highlight.age, label: highlight.label }}
+                describe={(p) => ({
+                  value: `${percent(p.y)} alive at ${p.x}`,
+                  detail: p.lo !== undefined ? `${percent(p.lo)}–${percent(p.hi!)} across ONS projections` : undefined,
+                })}
+                table={{ xHeader: 'Age', yHeader: 'Still alive', every: 5 }}
+              />
+            )}
           />
           <p className="text-xs text-ink-soft">{source}</p>
         </section>
