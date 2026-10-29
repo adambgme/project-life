@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { BirthDateForm } from './components/BirthDateForm'
 import { ImportButton } from './components/ImportButton'
 import { ImportDialog, type PendingImport } from './components/ImportDialog'
@@ -289,7 +289,9 @@ export function App() {
               <strong className="text-5xl font-semibold tracking-tight tabular-nums sm:text-7xl lg:text-6xl poster:text-xl">{lived.toLocaleString('en-GB')}</strong>{' '}
               {UNIT[view]}
             </span>{' '}
-            <span className="text-lg text-ink-soft poster:text-xl">of the {total} on a {gridYears}-year grid.</span>
+            <span className="text-lg text-ink-soft poster:text-xl">
+              of the {total} on a <span className="whitespace-nowrap">{gridYears}-year grid</span>.
+            </span>
           </p>
           {profile.statistics !== 'hidden' && (
             <LifeBar
@@ -318,7 +320,13 @@ export function App() {
               className="text-left underline decoration-rule underline-offset-4 hover:text-ink"
               data-testid="settings-summary"
             >
-              {settingsSummary(life.profile, gridYears)} · Change
+              {/* Each choice stays whole; the line breaks between them. */}
+              {settingsSummary(life.profile, gridYears).map((item) => (
+                <Fragment key={item}>
+                  <span className="whitespace-nowrap">{item} ·</span>{' '}
+                </Fragment>
+              ))}
+              Change
             </button>
           )}
           {profile.statistics !== 'hidden' && (
