@@ -287,3 +287,11 @@ test('the example life shows a made-up story that can\'t be edited', async ({ pa
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Your story' })).toHaveCount(0)
 })
+
+test('on a phone nothing runs off the side of the page', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 })
+  await page.goto('./')
+  await enterBirthDate(page, '15', 'June', '1990')
+  await expect(page.getByTestId('settings-summary')).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360)
+})

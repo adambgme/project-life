@@ -28,15 +28,15 @@ const label = 'text-sm text-ink-soft'
 
 const STATISTICS_NAMES: Record<Statistics, string> = { numbers: 'just the numbers', grid: 'chances on the grid', hidden: 'statistics hidden' }
 
-/** What's chosen in Settings, in a line: "Female · England · projected rates · 100-year grid · just the numbers". */
-export function settingsSummary(profile: Profile, gridYears: number): string {
+/** What's chosen in Settings, for a line: "Female", "England", "projected rates", "100-year grid", "just the numbers". */
+export function settingsSummary(profile: Profile, gridYears: number): string[] {
   const hidden = profile.statistics === 'hidden'
   return [
     ...(hidden ? [] : [SEX_NAMES[profile.sex].replace(', averaged', ' sexes'), NATION_NAMES[profile.nation], profile.basis === 'cohort' ? 'projected rates' : "this year's rates"]),
     `${gridYears}-year grid`,
     STATISTICS_NAMES[profile.statistics],
     ...(profile.patterns ? ['patterns on eras'] : []),
-  ].join(' · ')
+  ]
 }
 
 /** Settings, in a panel beside the grid (a sheet from the bottom on phones): the details that size the grid and the

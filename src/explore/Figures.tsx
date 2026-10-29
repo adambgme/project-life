@@ -84,6 +84,8 @@ export function Figures({ profile, today, isExample }: Props) {
   const sexWords = profile.sex === 'both' ? 'both sexes averaged' : `${profile.sex}s`
   const section = 'flex flex-col gap-3 border-t border-rule pt-5'
   const h3 = 'font-display text-2xl'
+  // Long chapters far down the page: the browser can skip laying them out until they're near the screen.
+  const later = `${section} [content-visibility:auto] [contain-intrinsic-size:auto_900px]`
   const source = `${data.source.attribution}. ${data.source.edition} life tables, released ${longDate(data.source.released)}.`
   // Every chart from the life tables points to the one full source line, at the end.
   const sourceLink = (
@@ -258,7 +260,7 @@ export function Figures({ profile, today, isExample }: Props) {
           {sourceLink}
         </section>
 
-        <section className={section} aria-labelledby="causes-title">
+        <section className={later} aria-labelledby="causes-title">
           <h3 id="causes-title" className={h3}>
             What people {isExample ? "Sam's" : 'your'} age most often die of
           </h3>
@@ -269,7 +271,7 @@ export function Figures({ profile, today, isExample }: Props) {
           <CausesSection age={from} sex={profile.sex} outsideEnglandWales={profile.nation === 'scotland' || profile.nation === 'northern-ireland'} />
         </section>
 
-        <section className={section} aria-labelledby="places-title" data-reveal>
+        <section className={later} aria-labelledby="places-title" data-reveal>
           <h3 id="places-title" className={h3}>
             Same birth year, different place
           </h3>

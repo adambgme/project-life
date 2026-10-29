@@ -67,7 +67,8 @@ export function CausesSection({ age, sex, outsideEnglandWales }: { age: number; 
       </p>
       <ol className="flex flex-col gap-2" data-testid="causes">
         {top.map((cause) => (
-          <li key={cause.code} className="grid grid-cols-[minmax(8rem,14rem)_1fr] items-center gap-3 text-sm">
+          // On phones the name goes above its bar, so the bars keep the width.
+          <li key={cause.code} className="grid grid-cols-1 items-center gap-x-3 gap-y-0.5 text-sm sm:grid-cols-[minmax(8rem,14rem)_1fr]">
             <span>{cause.name}</span>
             <span className="flex items-center gap-2">
               <span
