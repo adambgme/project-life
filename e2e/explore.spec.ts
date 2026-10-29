@@ -251,3 +251,20 @@ test('your odds, still: phones and reduced motion get every step marked, and eve
   await expect(page.getByTestId('chart-highlight')).toHaveCount(0)
   for (const label of ['1 in 2', '1 in 10']) await expect(odds.locator('svg text', { hasText: label })).toHaveCount(1)
 })
+
+test("what's ahead, and the ending: the summers and weekends left, then the figures in short", async ({ page }) => {
+  await seed(page, PROFILE)
+  await expect(page.getByTestId('ahead')).toHaveText(/^If you live to the average age for people like you, 8\d, that's about \d\d more summers and [\d,]+0 more weekends\.$/)
+  const summers = page.getByRole('img', { name: /^37 summers so far, and about \d\d ahead$/ })
+  await expect(summers).toBeVisible()
+  const ahead = Number((await summers.getAttribute('aria-label'))!.match(/about (\d+) ahead/)![1])
+  await expect(summers.locator('span')).toHaveCount(37 + ahead)
+
+  const ending = page.getByTestId('ending')
+  await expect(ending).toContainText(/Half of people like you reach \d\d, and about 1 in 10 reach \d\d\./)
+  await expect(ending).toContainText('The widest gap is between neighbourhoods')
+  // The life tables' source is given once, at the end, and the charts point to it.
+  await page.getByRole('link', { name: 'see Sources' }).first().click()
+  await expect(page.getByRole('heading', { name: 'Sources' })).toBeInViewport()
+  await expect(page.locator('#sources')).toContainText('Office for National Statistics')
+})
